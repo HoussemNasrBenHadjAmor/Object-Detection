@@ -99,7 +99,7 @@ def draw_detections(image: np.ndarray, detections: List[Detection], class_names)
 @app.post('/detect/yolov9', response_model=List[Detection])
 async def detect_object(file: UploadFile, threshold: float = 0.25 ):
     # Load our yolo model
-    MODEL_PATH = 'C:/Users/Houssem/Desktop/pytorch/backend_v2/yolov9_fgsm_aug_100.pt'
+    MODEL_PATH = 'C:/Users/Houssem/Desktop/pytorch/backend_v2/last.pt'
     model = YOLO(MODEL_PATH)
 
     # Process the uploaded image for object detection
