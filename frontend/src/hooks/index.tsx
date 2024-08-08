@@ -1,15 +1,19 @@
-import { getPredictionYolov9, getPredictionFRCNN } from "@/api";
+import {
+  getPredictionYolov9,
+  getPredictionFRCNN,
+  getPredictionYolov8,
+} from "@/api";
 import { useMutation } from "@tanstack/react-query";
 
-const useYolov8 = () => {
+const useYolov8 = (image: File | null, threshold: number) => {
   return useMutation({
-    mutationFn: getPredictionYolov9,
+    mutationFn: () => getPredictionYolov8({ image, threshold }),
   });
 };
 
-const useYolov9 = () => {
+const useYolov9 = (image: File | null, threshold: number) => {
   return useMutation({
-    mutationFn: getPredictionYolov9,
+    mutationFn: () => getPredictionYolov9({ image, threshold }),
   });
 };
 
@@ -19,9 +23,9 @@ const useYolov10 = () => {
   });
 };
 
-const useFrcnn = () => {
+const useFrcnn = (image: File | null, threshold: number) => {
   return useMutation({
-    mutationFn: getPredictionFRCNN,
+    mutationFn: () => getPredictionFRCNN({ image, threshold }),
   });
 };
 

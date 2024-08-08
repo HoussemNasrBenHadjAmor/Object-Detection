@@ -47,9 +47,11 @@ def draw_detections(image: np.ndarray, detections: List[Detection], class_names)
     color_mapping = { 
         0: (0, 255, 0),  # Lime referee
         1: (255, 0, 0),  # Red for player
-        2: (0, 0, 255), # Blue for goalkeeper
-        3: (255,255,0) # Yellow for ball
+        2: (0, 0, 255),  # Blue for goalkeeper
+        3: (255, 255, 0) # Yellow for ball
     }
+
+    height, width = image.shape[:2]
 
     for detection in detections:
         bbox = detection.box
@@ -57,21 +59,88 @@ def draw_detections(image: np.ndarray, detections: List[Detection], class_names)
         class_name = class_names.get(detection.class_id, "Unknown")
 
         # Draw bounding box
-        cv2.rectangle(image, (int(bbox[0]),int (bbox[1])) , (int (bbox[2]),int (bbox[3])) , color, 2)
+        cv2.rectangle(image, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), color, 2)
+        
         # Prepare label with class name and confidence
         label = f"{class_name}: {detection.confidence:.2f}"
-        #label = f'{detection.class_id} : {detection.confidence:.2f}'
         # Get label size
         (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)
+        # Calculate label background position
+        label_bg_x1 = int(bbox[0])
+        label_bg_y1 = int(bbox[1]) - h - 10
+        label_bg_x2 = label_bg_x1 + w
+        label_bg_y2 = int(bbox[1])
+
+        # Adjust position if label background is outside the image boundaries
+        if label_bg_x1 < 0:
+            label_bg_x1 = 0
+            label_bg_x2 = w
+        if label_bg_y1 < 0:
+            label_bg_y1 = 0
+            label_bg_y2 = h + 10
+        if label_bg_x2 > width:
+            label_bg_x2 = width
+            label_bg_x1 = label_bg_x2 - w
+        if label_bg_y2 > height:
+            label_bg_y2 = height
+            label_bg_y1 = label_bg_y2 - (h + 10)
+
         # Draw label background
-        cv2.rectangle(image, (int (bbox[0]), int (bbox[1]) - h - 10), (int (bbox[0]) + w, int (bbox[1])), color , -1)
+        cv2.rectangle(image, (label_bg_x1, label_bg_y1), (label_bg_x2, label_bg_y2), color, -1)
         # Put label on image
-        cv2.putText(image, label, (int (bbox[0]), int (bbox[1]) - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
+        text_x = label_bg_x1
+        text_y = label_bg_y2 - 5
+
+        cv2.putText(image, label, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
+    
     return image
 
 
 @app.post('/detect/yolov9', response_model=List[Detection])
-async def detect_object(file: UploadFile):
+async def detect_object(file: UploadFile, threshold: float = 0.25 ):
+    # Load our yolo model
+    MODEL_PATH = 'C:/Users/Houssem/Desktop/pytorch/backend_v2/yolov9_fgsm_aug_100.pt'
+    model = YOLO(MODEL_PATH)
+
+    # Process the uploaded image for object detection
+    image_bytes = await file.read()
+    image = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+ 
+    # Perform object detection with YOLOv9c
+    results = model.predict(image)
+    detections = results[0].boxes.data.cpu().numpy()
+    
+    # Convert predictions to numpy array
+    response = []
+    for detection in detections:
+        box = detection[:4].tolist()  # [x1, y1, x2, y2]
+        confidence = float(detection[4])
+        class_id = int(detection[5])
+        if confidence >= threshold:
+            response.append(Detection(box=box, confidence=confidence, class_id=class_id))  
+
+    # Define class names
+    class_names = {
+        0: "Ball",
+        1: "Goalkeeper",
+        2: "Player",
+        3: "Referee",
+        }     
+
+     # Draw detections on the image
+    image_with_detections = draw_detections(image, response, class_names)    
+
+    # Encode image back to bytes
+    _, img_encoded = cv2.imencode('.jpg', image_with_detections)
+    image_bytes = img_encoded.tobytes()
+    
+    return StreamingResponse(io.BytesIO(image_bytes), media_type="image/jpeg")
+
+
+
+@app.post('/detect/yolov8', response_model=List[Detection])
+async def detect_object(file: UploadFile, threshold: float = 0.25 ):
     # Load our yolo model
     MODEL_PATH = 'C:/Users/Houssem/Desktop/pytorch/backend_v2/yolov9_100_epochs.pt'
     model = YOLO(MODEL_PATH)
@@ -91,14 +160,15 @@ async def detect_object(file: UploadFile):
         box = detection[:4].tolist()  # [x1, y1, x2, y2]
         confidence = float(detection[4])
         class_id = int(detection[5])
-        response.append(Detection(box=box, confidence=confidence, class_id=class_id))  
+        if confidence >= threshold:
+            response.append(Detection(box=box, confidence=confidence, class_id=class_id))  
 
     # Define class names
     class_names = {
-        3: "Referee",
-        2: "Player",
+        0: "Ball",
         1: "Goalkeeper",
-        0: "Ball"
+        2: "Player",
+        3: "Referee",
         }     
 
      # Draw detections on the image
@@ -115,7 +185,7 @@ async def detect_object(file: UploadFile):
 
     
 @app.post('/detect/frcnn', response_model=List[Detection])
-async def detect_object(file: UploadFile):
+async def detect_object(file: UploadFile, threshold:float = 0.75):
     # Model path 
     MODEL_PATH = 'C:/Users/Houssem/Desktop/pytorch/backend_v2/best_model.pth'
 
@@ -151,12 +221,12 @@ async def detect_object(file: UploadFile):
     detections = results[0]
     response = []
     for box, score, label in zip(detections['boxes'], detections['scores'], detections['labels']):
-        # Filter out low-confidence detections
-        response.append(Detection(
-            box=box.cpu().numpy().tolist(),
-            confidence=score.item(),
-            class_id=label.item()
-        ))
+         if score >= threshold:  # Filter out low-confidence detections
+            response.append(Detection(
+                box=box.cpu().numpy().tolist(),
+                confidence=score.item(),
+                class_id=label.item()
+            ))
 
     # Define class names
     class_names = {

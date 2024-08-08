@@ -1,6 +1,6 @@
 "use client";
 
-import { useYolov9, useFrcnn } from "@/hooks";
+import { useYolov9, useFrcnn, useYolov8 } from "@/hooks";
 import { ChangeEvent, FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -19,13 +19,16 @@ import {
 } from "@/components/ui/select";
 
 export default function Home() {
+  const defaultThreshold = [0.25];
   const [image, setImage] = useState<File | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [detectedImageUrl, setDetectedImageUrl] = useState<string | null>(null);
+  const [threshold, setThreshold] = useState<number>(defaultThreshold[0]);
   const [error, setError] = useState<string | null>(null);
 
-  const yolov9 = useYolov9();
-  const frcnn = useFrcnn();
+  const yolov9 = useYolov9(image, threshold);
+  const frcnn = useFrcnn(image, threshold);
+  const yolov8 = useYolov8(image, threshold);
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -43,13 +46,18 @@ export default function Home() {
     setDetectedImageUrl(null); // Reset detected image URL
     setError(null); // Reset error
 
-    if (selectedModel === "Yolov9") {
-      yolov9.mutate(image, {
+    if (selectedModel === "Yolov9" && image) {
+      yolov9.mutate(undefined, {
+        onSuccess: (data) => setDetectedImageUrl(data), // Handle successful response
+        onError: (err) => setError(err.message), // Handle error response
+      });
+    } else if (selectedModel === "Yolov8" && image) {
+      yolov8.mutate(undefined, {
         onSuccess: (data) => setDetectedImageUrl(data),
         onError: (err) => setError(err.message),
       });
-    } else if (selectedModel === "F-R-CNN") {
-      frcnn.mutate(image, {
+    } else if (selectedModel === "F-R-CNN" && image) {
+      frcnn.mutate(undefined, {
         onSuccess: (data) => setDetectedImageUrl(data),
         onError: (err) => setError(err.message),
       });
@@ -62,7 +70,7 @@ export default function Home() {
     setSelectedModel(value);
   };
 
-  const isPending = yolov9.isPending || frcnn.isPending;
+  const isPending = yolov9.isPending || frcnn.isPending || yolov8.isPending;
 
   return (
     <div className="max-w-5xl mx-auto p-10 justify-center items-center flex flex-col">
@@ -87,6 +95,19 @@ export default function Home() {
               </SelectGroup>
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="grid w-full items-center gap-3">
+          <Label htmlFor="threshold">Score Percentage</Label>
+          <div className="flex flex-row gap-3 justify-center items-center">
+            <Slider
+              defaultValue={defaultThreshold}
+              max={1}
+              step={0.01}
+              onValueChange={(value) => setThreshold(value[0])}
+            />
+            <p className="text-sm font-black text-red-600">{threshold}</p>
+          </div>
         </div>
 
         <div className="grid w-full items-center gap-3">
