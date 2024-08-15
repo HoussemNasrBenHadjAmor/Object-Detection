@@ -3,7 +3,5 @@ __pycache__/
 .vscode/
 tmp/
 logs/
-datasets/
-configs/
 tests/
 *.pth
