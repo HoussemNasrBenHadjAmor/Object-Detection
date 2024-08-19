@@ -30,7 +30,7 @@ def process_split(split_dir):
                     print(f"Skip object with degenerate bbox (w={w:.2f}, h={h:.2f}).")
                     continue
                 boxes.append([xmin, ymin, xmin + w, ymin + h])
-                classes.append(coco.getCatIds().index(obj['category_id']))
+                classes.append(coco.getCatIds().index(obj['category_id']-1))
         dataset.append({
             'image': os.path.abspath(image_path),
             'boxes': boxes,
