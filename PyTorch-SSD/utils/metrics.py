@@ -3,6 +3,7 @@ import numpy as np
 from utils.boxes import calculate_ious
 from utils.constants import BACKGROUND_INDEX
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class Mean(object):
     def __init__(self):
@@ -20,7 +21,6 @@ class Mean(object):
     def result(self):
         return self.sum / self.count
 
-
 class AveragePrecision(object):
     def __init__(self, num_classes, recall_steps):
         self.num_classes = num_classes
@@ -28,7 +28,7 @@ class AveragePrecision(object):
         self.reset()
 
     def reset(self):
-        self.num_relevent = torch.zeros([self.num_classes])
+        self.num_relevent = torch.zeros([self.num_classes], device=device)
         self.det_scores = []
         self.det_classes = []
         self.true_positives = []
@@ -55,7 +55,10 @@ class AveragePrecision(object):
                 ],
                 return_counts=True
             )
-            self.num_relevent[class_indices] += counts.cpu()
+            
+            # Move counts to the same device as self.num_relevent
+            counts = counts.to(device)
+            self.num_relevent[class_indices] += counts
 
             if num_dets == 0:
                 continue
@@ -77,8 +80,8 @@ class AveragePrecision(object):
             indices = torch.where(mask)   # ground truth indices, detection indices
             if indices[0].shape[0] > 0:
                 matches = torch.stack(indices, axis=1)   # [num_matches, 2]
-                matches = matches.cpu().numpy()   # only np.unique() supports `return_index` option
-                ious = ious.cpu().numpy()
+                matches = matches.to(device).cpu().numpy()   # only np.unique() supports `return_index` option
+                ious = ious.to(device).cpu().numpy()
                 ious = ious[matches[:, 0], matches[:, 1]]
 
                 # Find the ground truth with the best IoU for each detection
@@ -87,7 +90,7 @@ class AveragePrecision(object):
                 matches = matches[indices]
                 ious = ious[indices]
 
-                is_difficult = difficulties[i].bool().cpu().numpy()[matches[:, 0]]
+                is_difficult = difficulties[i].to(device).bool().cpu().numpy()[matches[:, 0]]
                 is_fp[matches[:, 1][is_difficult]] = (
                     np.expand_dims(ious[is_difficult], axis=-1)
                     < iou_thres
@@ -98,7 +101,7 @@ class AveragePrecision(object):
                 matches = matches[indices]
                 ious = ious[indices]
 
-                is_easy = ~(difficulties[i].bool().cpu().numpy()[matches[:, 0]])
+                is_easy = ~(difficulties[i].to(device).bool().cpu().numpy()[matches[:, 0]])
                 is_tp[matches[:, 1][is_easy]] = (
                     np.expand_dims(ious[is_easy], axis=-1)
                     >= iou_thres
@@ -115,21 +118,24 @@ class AveragePrecision(object):
             APs: float32 tensor. Shape: [num_classes, 10].
         """
         scores, indices = torch.sort(
-            torch.FloatTensor(self.det_scores),
+            torch.FloatTensor(self.det_scores).to(device),
             descending=True
         )
-        classes = torch.IntTensor(self.det_classes)[indices]
-        true_positives = torch.IntTensor(self.true_positives)[indices]
-        false_positives = torch.IntTensor(self.false_positives)[indices]
-        recall_thres = torch.linspace(0, 1, self.recall_steps)
+        # Ensure indices is on CPU
+        indices = indices.cpu()
+        
+        classes = torch.IntTensor(self.det_classes)[indices].to(device)
+        true_positives = torch.IntTensor(self.true_positives)[indices].to(device)
+        false_positives = torch.IntTensor(self.false_positives)[indices].to(device)
+        recall_thres = torch.linspace(0, 1, self.recall_steps).to(device)
 
-        APs = torch.zeros([self.num_classes, 10])
+        APs = torch.zeros([self.num_classes, 10], device=device)
         for c in range(self.num_classes):
             if (classes == c).int().sum() == 0:
                 continue
 
-            tp_cum = torch.cumsum(true_positives[classes == c], axis=0)    # [n, 10]
-            fp_cum = torch.cumsum(false_positives[classes == c], axis=0)   # [n, 10]
+            tp_cum = torch.cumsum(true_positives[classes == c], axis=0).to(device)    # [n, 10]
+            fp_cum = torch.cumsum(false_positives[classes == c], axis=0).to(device)   # [n, 10]
             num_relevent = self.num_relevent[c]
 
             recalls = tp_cum / num_relevent
