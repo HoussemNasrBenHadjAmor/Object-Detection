@@ -8,6 +8,7 @@ from torch.cuda.amp import autocast, GradScaler
 from utils.data.dataloader import create_dataloader
 from utils.misc import load_config, build_model, nms
 from utils.metrics import Mean, AveragePrecision
+from utils.plots import (save_box_loss, save_cls_loss)
 
 
 class CheckpointManager(object):
@@ -60,13 +61,20 @@ def train_step(images, true_boxes, true_classes, model, optim, amp, scaler,
     optim.zero_grad()
     with autocast(enabled=amp):
         preds = model(images)
-        loss = model.compute_loss(preds, true_boxes, true_classes)
+        regression_preds, class_preds = preds
+        
+        loss, box_loss, cls_loss = model.compute_loss(preds, true_boxes, true_classes)
     scaler.scale(loss).backward()
     scaler.step(optim)
     scaler.update()
 
     loss = loss.item()
     metrics['loss'].update(loss, images.shape[0])
+    
+    box_loss = box_loss.cpu().detach().item()
+    cls_loss = cls_loss.mean().item()
+    
+    return box_loss, cls_loss
 
 
 def test_step(images, true_boxes, true_classes, difficulties, model, amp,
@@ -78,14 +86,14 @@ def test_step(images, true_boxes, true_classes, difficulties, model, amp,
 
     with autocast(enabled=amp):
         preds = model(images)
-        loss = model.compute_loss(preds, true_boxes, true_classes)
+        loss, box_loss, cls_loss = model.compute_loss(preds, true_boxes, true_classes)
     loss = loss.item()
     metrics['loss'].update(loss, images.shape[0])
 
     det_boxes, det_scores, det_classes = nms(*model.decode(preds))
     metrics['APs'].update(det_boxes, det_scores, det_classes,
                           true_boxes, true_classes, difficulties)
-
+    return box_loss, cls_loss
 
 def main():
     parser = argparse.ArgumentParser(
@@ -159,12 +167,20 @@ def main():
         'train': SummaryWriter(os.path.join(args.logdir, 'train')),
         'val': SummaryWriter(os.path.join(args.logdir, 'val'))
     }
-
+    
+    # For plotting
+    train_box_loss_list = []
+    train_cls_loss_list = []
+  
     # Kick off
     for epoch in range(ckpt.epoch + 1, cfg.epochs + 1):
         print("-" * 10)
         print("Epoch: %d/%d" % (epoch, cfg.epochs))
-
+        
+        # Initialize lists to store loss values for the current epoch
+        epoch_box_loss = []
+        epoch_cls_loss = []
+        
         # Train
         model.train()
         metrics['loss'].reset()
@@ -182,7 +198,7 @@ def main():
                     bar_format="{l_bar}{bar:20}{r_bar}",
                     desc="Training")
         for (images, true_boxes, true_classes, _) in pbar:
-            train_step(images,
+            box_loss, cls_loss = train_step(images,
                        true_boxes,
                        true_classes,
                        model=model,
@@ -191,6 +207,12 @@ def main():
                        scaler=scaler,
                        metrics=metrics,
                        device=device)
+            
+            # Accumulate the losses for this epoch
+            epoch_box_loss.append(box_loss)
+            epoch_cls_loss.append(cls_loss)
+
+            
             loss = metrics['loss'].result
             lr = get_lr(optim)
             pbar.set_postfix(loss='%.5f' % metrics['loss'].result, lr=lr)
@@ -200,6 +222,14 @@ def main():
         writers['train'].add_scalar('Loss', loss, epoch)
         writers['train'].add_scalar('Learning rate', get_lr(optim), epoch)
         scheduler.step()
+        
+        # Store the average losses of the epoch
+        train_box_loss_list.append(sum(epoch_box_loss) / len(epoch_box_loss))
+        train_cls_loss_list.append(sum(epoch_cls_loss) / len(epoch_cls_loss))
+        
+        # Plotting the box_loss and cls_loss
+        save_box_loss(train_box_loss_list, "/kaggle/working/runs/plots", title=f'Box_loss_train')
+        save_cls_loss(train_cls_loss_list, "/kaggle/working/runs/plots", title=f'Cls_loss_train')
 
         # Validation
         if epoch % args.val_period == 0:

@@ -167,7 +167,7 @@ class SSD(nn.Sequential):
             + positvie_classification_loss
             + negative_classification_loss
         ) / num_positives.sum()
-        return total_loss
+        return total_loss, regression_loss, classification_loss
 
     def _encode_ground_truth(self, true_boxes, true_classes):
         """
