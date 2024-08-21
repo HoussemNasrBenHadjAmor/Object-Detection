@@ -9,6 +9,7 @@ from utils.data.dataloader import create_dataloader
 from utils.misc import load_config, build_model, nms
 from utils.metrics import Mean, AveragePrecision
 from utils.plots import (save_box_loss, save_cls_loss)
+from utils.engine import train_step, test_step
 
 
 class CheckpointManager(object):
@@ -50,50 +51,6 @@ class CheckpointManager(object):
 def get_lr(optim):
     for param_group in optim.param_groups:
         return param_group['lr']
-
-
-def train_step(images, true_boxes, true_classes, model, optim, amp, scaler,
-               metrics, device):
-    images = images.to(device)
-    true_boxes = [x.to(device) for x in true_boxes]
-    true_classes = [x.to(device) for x in true_classes]
-
-    optim.zero_grad()
-    with autocast(enabled=amp):
-        preds = model(images)
-        regression_preds, class_preds = preds
-        
-        loss, box_loss, cls_loss = model.compute_loss(preds, true_boxes, true_classes)
-    scaler.scale(loss).backward()
-    scaler.step(optim)
-    scaler.update()
-
-    loss = loss.item()
-    metrics['loss'].update(loss, images.shape[0])
-    
-    box_loss = box_loss.cpu().detach().item()
-    cls_loss = cls_loss.mean().item()
-    
-    return box_loss, cls_loss
-
-
-def test_step(images, true_boxes, true_classes, difficulties, model, amp,
-              metrics, device):
-    images = images.to(device)
-    true_boxes = [x.to(device) for x in true_boxes]
-    true_classes = [x.to(device) for x in true_classes]
-    difficulties = [x.to(device) for x in difficulties]
-
-    with autocast(enabled=amp):
-        preds = model(images)
-        loss, box_loss, cls_loss = model.compute_loss(preds, true_boxes, true_classes)
-    loss = loss.item()
-    metrics['loss'].update(loss, images.shape[0])
-
-    det_boxes, det_scores, det_classes = nms(*model.decode(preds))
-    metrics['APs'].update(det_boxes, det_scores, det_classes,
-                          true_boxes, true_classes, difficulties)
-    return box_loss, cls_loss
 
 def main():
     parser = argparse.ArgumentParser(
@@ -171,6 +128,8 @@ def main():
     # For plotting
     train_box_loss_list = []
     train_cls_loss_list = []
+    valid_box_loss_list = []
+    valid_cls_loss_list = []
   
     # Kick off
     for epoch in range(ckpt.epoch + 1, cfg.epochs + 1):
@@ -178,8 +137,10 @@ def main():
         print("Epoch: %d/%d" % (epoch, cfg.epochs))
         
         # Initialize lists to store loss values for the current epoch
-        epoch_box_loss = []
-        epoch_cls_loss = []
+        train_epoch_box_loss = []
+        train_epoch_cls_loss = []
+        valid_epoch_box_loss = []
+        valid_epoch_cls_loss = []
         
         # Train
         model.train()
@@ -209,8 +170,8 @@ def main():
                        device=device)
             
             # Accumulate the losses for this epoch
-            epoch_box_loss.append(box_loss)
-            epoch_cls_loss.append(cls_loss)
+            train_epoch_box_loss.append(box_loss)
+            train_epoch_cls_loss.append(cls_loss)
 
             
             loss = metrics['loss'].result
@@ -224,12 +185,12 @@ def main():
         scheduler.step()
         
         # Store the average losses of the epoch
-        train_box_loss_list.append(sum(epoch_box_loss) / len(epoch_box_loss))
-        train_cls_loss_list.append(sum(epoch_cls_loss) / len(epoch_cls_loss))
+        train_box_loss_list.append(sum(train_epoch_box_loss) / len(train_epoch_box_loss))
+        train_cls_loss_list.append(sum(train_epoch_cls_loss) / len(train_epoch_cls_loss))
         
         # Plotting the box_loss and cls_loss
-        save_box_loss(train_box_loss_list, "/kaggle/working/runs/plots", title=f'Box_loss_train')
-        save_cls_loss(train_cls_loss_list, "/kaggle/working/runs/plots", title=f'Cls_loss_train')
+        save_box_loss(train_box_loss_list, f"{cfg.OUTPUT_DIR}/plots", title=f'train_box_loss')
+        save_cls_loss(train_cls_loss_list, f"{cfg.OUTPUT_DIR}/plots", title=f'train_cls_loss')
 
         # Validation
         if epoch % args.val_period == 0:
@@ -241,7 +202,7 @@ def main():
                         desc="Validation")
             with torch.no_grad():
                 for (images, true_boxes, true_classes, difficulties) in pbar:
-                    test_step(images,
+                    box_loss, cls_loss = test_step(images,
                               true_boxes,
                               true_classes,
                               difficulties,
@@ -250,6 +211,19 @@ def main():
                               metrics=metrics,
                               device=device)
                     pbar.set_postfix(loss='%.5f' % metrics['loss'].result)
+                    
+            # Accumulate the losses for this epoch
+            valid_epoch_box_loss.append(box_loss)
+            valid_epoch_cls_loss.append(cls_loss)
+            
+            # Store the average losses of the epoch
+            valid_box_loss_list.append(sum(valid_epoch_box_loss) / len(valid_epoch_box_loss))
+            valid_cls_loss_list.append(sum(valid_epoch_cls_loss) / len(valid_epoch_cls_loss))
+        
+            # Plotting the box_loss and cls_loss
+            save_box_loss(valid_box_loss_list, f"{cfg.OUTPUT_DIR}/plots", title=f'valid_box_loss')
+            save_cls_loss(valid_cls_loss_list, f"{cfg.OUTPUT_DIR}/plots", title=f'valid_cls_loss')
+            
             APs = metrics['APs'].result
             mAP50 = APs[:, 0].mean()
             mAP = APs.mean()
@@ -261,6 +235,7 @@ def main():
             writers['val'].add_scalar('Loss', metrics['loss'].result, epoch)
             writers['val'].add_scalar('mAP@[0.5]', mAP50, epoch)
             writers['val'].add_scalar('mAP@[0.5:0.95]', mAP, epoch)
+            
 
         ckpt.epoch += 1
         ckpt.save('last.pth')

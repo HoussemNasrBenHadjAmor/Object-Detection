@@ -1,3 +1,6 @@
+import cv2
+import numpy as np
+import torch
 import matplotlib.pyplot as plt
 import os
 
@@ -30,5 +33,4 @@ def save_cls_loss(loss, OUT_DIR, title):
     train_ax.set_ylabel('Loss')
     train_ax.legend()
     figure.savefig(f"{OUT_DIR}/{title}.png")
-    plt.close(figure)    
-      
+    plt.close(figure)
