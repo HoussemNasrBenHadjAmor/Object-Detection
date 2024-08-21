@@ -189,8 +189,8 @@ def main():
         train_cls_loss_list.append(sum(train_epoch_cls_loss) / len(train_epoch_cls_loss))
         
         # Plotting the box_loss and cls_loss
-        save_box_loss(train_box_loss_list, f"{cfg.OUTPUT_DIR}/plots", title=f'train_box_loss')
-        save_cls_loss(train_cls_loss_list, f"{cfg.OUTPUT_DIR}/plots", title=f'train_cls_loss')
+        save_box_loss(train_box_loss_list, f"{args.logdir}/plots", title=f'train_box_loss')
+        save_cls_loss(train_cls_loss_list, f"{args.logdir}/plots", title=f'train_cls_loss')
 
         # Validation
         if epoch % args.val_period == 0:
@@ -221,8 +221,8 @@ def main():
             valid_cls_loss_list.append(sum(valid_epoch_cls_loss) / len(valid_epoch_cls_loss))
         
             # Plotting the box_loss and cls_loss
-            save_box_loss(valid_box_loss_list, f"{cfg.OUTPUT_DIR}/plots", title=f'valid_box_loss')
-            save_cls_loss(valid_cls_loss_list, f"{cfg.OUTPUT_DIR}/plots", title=f'valid_cls_loss')
+            save_box_loss(valid_box_loss_list, f"{args.logdir}/plots", title=f'valid_box_loss')
+            save_cls_loss(valid_cls_loss_list, f"{args.logdir}/plots", title=f'valid_cls_loss')
             
             APs = metrics['APs'].result
             mAP50 = APs[:, 0].mean()
