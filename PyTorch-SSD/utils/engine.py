@@ -13,7 +13,7 @@ def train_step(images, true_boxes, true_classes, model, optim, amp, scaler,
         preds = model(images)
         regression_preds, class_preds = preds
         loss, box_loss, cls_loss = model.compute_loss(preds, true_boxes, true_classes)
-
+        print(f'loss after training  : {loss}')
     scaler.scale(loss).backward()
     scaler.step(optim)
     scaler.update()
@@ -43,6 +43,11 @@ def test_step(images, true_boxes, true_classes, difficulties, model, amp,
     metrics['loss'].update(loss, images.shape[0])
 
     det_boxes, det_scores, det_classes = nms(*model.decode(preds))
+
+    print(f'length of first class image : {len(det_classes[0])}')
+    print(f'length of second class image : {len(det_classes[1])}')
+    print(f'length of third class image : {len(det_classes[2])}')
+    print(f'length of fourth class image : {len(det_classes[3])}')
 
     
 
