@@ -9,7 +9,14 @@ import io
 from starlette.responses import StreamingResponse
 import torch
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2
+from torchvision.models.detection import ssd300_vgg16
 from torchvision.transforms import functional as F
+
+# Assuming your script is in the root directory
+#sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from models.create_fasterrcnn_model import create_model
+
 
 app = FastAPI()
 
@@ -185,6 +192,70 @@ async def detect_object(file: UploadFile, threshold: float = 0.25 ):
 
 
     
+@app.post('/detect/ssd', response_model=List[Detection])
+async def detect_object(file: UploadFile, threshold:float = 0.25):
+    # Model path 
+    MODEL_PATH = 'C:/Users/Houssem/Desktop/pytorch/backend_v2/ssd.pth'
+    
+    # Load the state_dict
+    checkpoint = torch.load(MODEL_PATH, map_location=device)
+
+    # Get the classes and classes number from the checkpoint
+    NUM_CLASSES = checkpoint['config']['NC']
+
+    # Create our model
+    model = ssd300_vgg16(num_classes = NUM_CLASSES, pretrained=False)
+
+    # Load the state_dict into the model
+    model.load_state_dict(checkpoint['model_state_dict'])
+
+    # Set the model to device and evaluation mode
+    model.to(device).eval()
+
+    # Process the uploaded image for object detection
+    image_bytes = await file.read()
+    image = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+
+    # Convert the image to a PyTorch tensor and normalize it
+    image_tensor = F.to_tensor(image).to(device)
+    image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
+ 
+    # Perform object detection with Faster R-CNN
+    with torch.no_grad():
+        results = model(image_tensor)
+        print(f'length of results : {len(results[0]['labels'])}')
+
+    detections = results[0]
+    response = []
+    for box, score, label in zip(detections['boxes'], detections['scores'], detections['labels']):
+         if score >= threshold:  # Filter out low-confidence detections
+            response.append(Detection(
+                box=box.cpu().numpy().tolist(),
+                confidence=score.item(),
+                class_id=label.item()
+            ))
+
+    # Define class names
+    class_names = {
+        0: "_background_",
+        1: "Ball",
+        2: "Goalkeeper",
+        3: "Player",
+        4: 'Referee'
+        }     
+
+    # Draw detections on the image
+    image_with_detections = draw_detections(image, response, class_names)
+
+    # Encode image back to bytes
+    _, img_encoded = cv2.imencode('.jpg', image_with_detections)
+    image_bytes = img_encoded.tobytes()
+
+    return StreamingResponse(io.BytesIO(image_bytes), media_type="image/jpeg")
+
+
+
 @app.post('/detect/frcnn', response_model=List[Detection])
 async def detect_object(file: UploadFile, threshold:float = 0.75):
     # Model path 

@@ -1,5 +1,6 @@
 import torch
-from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2
+#from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2
+from models.create_fasterrcnn_model import create_model
 #from torchvision.transforms import functional as F
 import torch.nn.functional as F
 from PIL import Image
@@ -24,6 +25,7 @@ def parse_opt():
         '-c', '--config', default=None,
         help='path to the data config file'
     )
+    
     parser.add_argument(
         '-m', '--model', default=None,
         help='path to the model'
@@ -54,22 +56,25 @@ def main (args):
     WIDTH = data_configs['WIDTH']    
     HEIGHT = data_configs['HEIGHT']
     SAVE_DIR_EXAMPLES_PATH = data_configs['SAVE_DIR_EXAMPLES_PATH']
+    SIZE = data_configs['SIZE']
+    MODEL_NAME = data_configs['MODEL_NAME']
     
     use_cuda=True
     device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
 
-    # Load the state_dict
-    checkpoint = torch.load(MODEL_PATH, map_location=device)
-
+    print('Loading pretrained weights...')
+    # Load the pretrained checkpoint.
+    checkpoint = torch.load(MODEL_PATH, map_location=device) 
+    keys = list(checkpoint['model_state_dict'].keys())
+    ckpt_state_dict = checkpoint['model_state_dict']
     # Get the classes and classes number from the checkpoint
     NUM_CLASSES = checkpoint['config']['NC']
-    #CLASSES = checkpoint['config']['CLASSES']
 
-    # Create our model
-    model = fasterrcnn_resnet50_fpn_v2(num_classes = NUM_CLASSES, pretrained=False, coco_model=False)
-
-    # Load the state_dict into the model
-    model.load_state_dict(checkpoint['model_state_dict'])
+    # Build the new model with number of classes same as checkpoint.
+    build_model = create_model[MODEL_NAME]
+    model = build_model(num_classes=NUM_CLASSES, size=SIZE)
+    # Load weights.
+    model.load_state_dict(ckpt_state_dict)
 
     # Set the model to device and evaluation mode
     model.to(device).eval()
@@ -100,8 +105,9 @@ def main (args):
         perturbed_image = torch.clamp(perturbed_image, 0, 1)
         return perturbed_image
 
-    def check_pred_target(output , target ,skip):
-        output_shape = output[0]['labels'].shape[0]
+    def check_pred_target(output , target ,skip, threshold):
+        mask = output[0]['scores'] > threshold
+        output_shape = output['labels'][mask].shape[0]
         target_shape = target['labels'].shape[0]
         if output_shape != target_shape:
             if skip:
@@ -176,7 +182,7 @@ def main (args):
 
         etree.ElementTree(anno_tree).write(fsgm_label_path, pretty_print=True)        
     
-    def create_adversarial_attack (epsilon, base_dir, output_dir, width, height, classes, class_mapping, device) :
+    def create_adversarial_attack (epsilon, base_dir, output_dir, width, height, classes, class_mapping, device, threshold) :
     # Process the entire validation dataset
         adv_examples = []
         correct = 0
@@ -196,7 +202,7 @@ def main (args):
                 outputs = model(image)
 
                 # Check if pred and target are the same to compute the loss or just skip
-                result = check_pred_target(outputs , target, True)
+                result = check_pred_target(outputs , target, True, threshold)
                 if result == None:
                     continue
 
@@ -254,7 +260,7 @@ def main (args):
     adv_examples = []
     # Run test for each epsilon
     for eps in EPSILONS:
-        _, ex = create_adversarial_attack(eps, BASE_DIR, OUTPUT_DIR, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, device)
+        _, ex = create_adversarial_attack(eps, BASE_DIR, OUTPUT_DIR, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, device, 0.5)
         adv_examples.extend(ex)
 
     # Select 10 random examples
