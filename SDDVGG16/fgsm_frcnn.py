@@ -64,8 +64,7 @@ def main (args):
 
     print('Loading pretrained weights...')
     # Load the pretrained checkpoint.
-    checkpoint = torch.load(MODEL_PATH, map_location=device) 
-    keys = list(checkpoint['model_state_dict'].keys())
+    checkpoint = torch.load(MODEL_PATH, map_location=device)
     ckpt_state_dict = checkpoint['model_state_dict']
     # Get the classes and classes number from the checkpoint
     NUM_CLASSES = checkpoint['config']['NC']
