@@ -217,7 +217,7 @@ def main (args):
                 adv_outputs = model(adv_image)
 
                 # Check if adv_pred and target are the same
-                result = check_pred_target(adv_outputs , target, False)
+                result = check_pred_target(adv_outputs , target, False, threshold)
 
                 if result != None:
                     # Means the adv_pred and target are not the same
