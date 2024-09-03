@@ -27,7 +27,7 @@ def train_one_epoch(
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1, fmt="{value:.6f}"))
-    header = f"Epoch: [{epoch}]"
+    header = f"Epoch: [{epoch}] in training"
 
     # List to store batch losses.
     batch_loss_list = []
@@ -111,7 +111,7 @@ def evalute_one_epoch(
 
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
-    header = f"Epoch: [{epoch}]"
+    header = f"Epoch: [{epoch}] in validation"
 
     # List to store batch losses.
     batch_loss_list = []
@@ -211,7 +211,7 @@ def evaluate(
     cpu_device = torch.device("cpu")
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
-    header = "Test:"
+    header = "Test with COCO EVALUATOR"
 
     coco = get_coco_api_from_dataset(data_loader.dataset)
     iou_types = _get_iou_types(model)
