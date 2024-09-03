@@ -367,13 +367,13 @@ def main(args):
         
 
         # Save box loss for each training epoch
-        save_box_loss(all_train_box_loss_per_epoch, OUT_DIR, title='Box_loss_train')
+        save_box_loss(all_train_box_loss_per_epoch, OUT_DIR, title='Box_loss_train', label='Train Loss')
         # Save box loss for each validating epoch
-        save_box_loss(all_valid_box_loss_per_epoch, OUT_DIR, title='Box_loss_valid')
+        save_box_loss(all_valid_box_loss_per_epoch, OUT_DIR, title='Box_loss_valid', label='valid Loss')
         # Save class loss for each training epoch 
-        save_cls_loss(all_train_cls_loss_per_epochs, OUT_DIR, title='Cls_loss_train')
+        save_cls_loss(all_train_cls_loss_per_epochs, OUT_DIR, title='Cls_loss_train', label='Train Loss')
         # Save class loss for each validating epoch 
-        save_cls_loss(all_valid_cls_loss_per_epoch, OUT_DIR, title='Cls_loss_valid')
+        save_cls_loss(all_valid_cls_loss_per_epoch, OUT_DIR, title='Cls_loss_valid', label='Valid Loss')
 
         # Save mAP50  for each epoch
         save_map50(val_mAP50, OUT_DIR, title='Metrics-mAP50(B)')
