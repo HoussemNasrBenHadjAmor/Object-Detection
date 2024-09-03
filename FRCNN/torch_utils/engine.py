@@ -100,6 +100,66 @@ def train_one_epoch(
     return metric_logger, train_box_loss_per_epoch, train_class_loss_per_epoch, train_dfl_loss_per_epoch, batch_loss_list, batch_loss_cls_list, batch_loss_box_reg_list, batch_loss_objectness_list, batch_loss_rpn_list
 
 
+def evalute_one_epoch(
+    model,
+    data_loader,
+    device,
+    epoch,
+    train_loss_hist,
+    print_freq
+):
+
+    model.train()
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    header = f"Epoch: [{epoch}]"
+
+    # List to store batch losses.
+    batch_loss_list = []
+    batch_loss_cls_list = []
+    batch_loss_box_reg_list = []
+    batch_loss_objectness_list = []
+    batch_loss_rpn_list = []
+    valid_box_loss_per_epoch = []
+    valid_class_loss_per_epoch = []
+    valid_dfl_loss_per_epoch = [] 
+
+
+    step_counter = 0
+    for images, targets in metric_logger.log_every(data_loader, print_freq, header):
+        step_counter += 1
+        images = list(image.to(device) for image in images)
+        # Ensure targets is a list of dictionaries with tensor values
+        targets = [{k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in t.items()} for t in targets]
+        
+        loss_dict = model(images, targets)
+        losses = sum(loss for loss in loss_dict.values())
+
+        # reduce losses over all GPUs for logging purposes
+        loss_dict_reduced = utils.reduce_dict(loss_dict)
+        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+
+        loss_value = losses_reduced.item()
+
+        if not math.isfinite(loss_value):
+            print(f"Loss is {loss_value}, stopping validating")
+            print(loss_dict_reduced)
+            sys.exit(1)
+
+        metric_logger.update(loss=losses_reduced, **loss_dict_reduced)
+        batch_loss_list.append(loss_value)
+        batch_loss_cls_list.append(loss_dict_reduced['loss_classifier'].detach().cpu())
+        batch_loss_box_reg_list.append(loss_dict_reduced['loss_box_reg'].detach().cpu())
+        batch_loss_objectness_list.append(loss_dict_reduced['loss_objectness'].detach().cpu())
+        batch_loss_rpn_list.append(loss_dict_reduced['loss_rpn_box_reg'].detach().cpu())
+        train_loss_hist.send(loss_value)
+
+    valid_box_loss_per_epoch.append(sum(batch_loss_box_reg_list)/len(batch_loss_box_reg_list))
+    valid_class_loss_per_epoch.append(sum(batch_loss_cls_list)/len(batch_loss_cls_list))
+    valid_dfl_loss_per_epoch.append(sum(batch_loss_rpn_list)/len(batch_loss_rpn_list))
+
+    return metric_logger, valid_box_loss_per_epoch, valid_class_loss_per_epoch, valid_dfl_loss_per_epoch, batch_loss_list, batch_loss_cls_list, batch_loss_box_reg_list, batch_loss_objectness_list, batch_loss_rpn_list
+
+
 def _get_iou_types(model):
     model_without_ddp = model
     if isinstance(model, torch.nn.parallel.DistributedDataParallel):
