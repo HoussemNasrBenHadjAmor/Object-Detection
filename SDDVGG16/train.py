@@ -11,7 +11,7 @@ python train.py --model fasterrcnn_resnet50_fpn --epochs 2 --config data_configs
 python train.py --model fasterrcnn_resnet50_fpn --epochs 2 --use-train-aug --config data_configs/voc.yaml --project-name resnet50fpn_voc --batch-size 4
 """
 
-from torch_utils.engine import (train_one_epoch, evaluate, calculate_precision, calculate_recall)
+from torch_utils.engine import (train_one_epoch, evaluate, calculate_precision, calculate_recall, evalute_one_epoch)
 
 from utils.metrics import (ap_per_class)
 
@@ -160,21 +160,29 @@ def main(args):
 
     # Initialize the Averager class.
     train_loss_hist = Averager()
+    # Intiialize the Averager valid class.
+    valid_loss_hist = Averager()
     # Train and validation loss lists to store loss values of all
     # iterations till ena and plot graphs for all iterations.
     train_loss_list = []
+    valid_loss_list = []
     loss_cls_list = []
+    valid_loss_cls_list= []
     loss_box_reg_list = []
+    valid_loss_box_reg_list = []
     loss_objectness_list = []
+    valid_loss_objectness_list = []
     loss_rpn_list = []
+    valid_loss_rpn_list = []
     train_loss_list_epoch = []
+    valid_loss_list_epoch = []
     val_map_05 = []
     val_map = []
     all_train_box_loss_per_epoch = []
-    all_train_cls_loss_per_epochs = []
-    all_train_dfl_loss_per_epoch = []
     all_valid_box_loss_per_epoch = []
-    all_valid_cls_loss_per_epochs = []
+    all_train_cls_loss_per_epochs = []
+    all_valid_cls_loss_per_epoch = []
+    all_train_dfl_loss_per_epoch = []
     all_valid_dfl_loss_per_epoch = []
     val_precision = []
     val_recall = []
@@ -290,6 +298,22 @@ def main(args):
             scheduler=scheduler
         )
 
+        _,  valid_box_loss_per_epoch, \
+             valid_cls_loss_per_epochs, \
+             valid_dfl_loss_per_epoch, \
+             valid_batch_loss_list, \
+             valid_batch_loss_cls_list, \
+             valid_batch_loss_box_reg_list, \
+             valid_batch_loss_objectness_list, \
+             valid_batch_loss_rpn_list = evalute_one_epoch(
+            model, 
+            train_loader, 
+            DEVICE, 
+            epoch, 
+            valid_loss_hist,
+            print_freq=100,
+        )
+
         coco_evaluator, stats, val_pred_image, category_ids, category_names, tp, conf, pred_cls, target_cls, fn_count = evaluate(
             model, 
             valid_loader, 
@@ -307,12 +331,17 @@ def main(args):
         val_precision_per_epoch.append(precision)
         val_recall_per_epoch.append(recall)
 
-        # Append the current epoch's batch-wise losses to the `train_loss_list`.
         train_loss_list.extend(batch_loss_list)
+        valid_loss_list.extend(valid_batch_loss_list)
         loss_cls_list.extend(batch_loss_cls_list)
+        valid_loss_cls_list.extend(valid_batch_loss_cls_list)
         loss_box_reg_list.extend(batch_loss_box_reg_list)
+        valid_loss_box_reg_list.extend(valid_batch_loss_box_reg_list)
         loss_objectness_list.extend(batch_loss_objectness_list)
+        valid_loss_objectness_list.extend(valid_batch_loss_objectness_list)
         loss_rpn_list.extend(batch_loss_rpn_list)
+        valid_loss_rpn_list.extend(valid_batch_loss_rpn_list)
+
         # Append curent epoch's average loss to `train_loss_list_epoch`.
         val_map_05.append(stats[1])
         val_map.append(stats[0])
@@ -331,42 +360,23 @@ def main(args):
         np_tp = np.array(tp, dtype=bool)
         np_tp = np_tp[:, np.newaxis]
         ap_per_class(category_names,np_tp, np.array(conf), np.array(pred_cls), np.array(target_cls), plot=True , save_dir = OUT_DIR)
-        
-
-
 
         # Save box loss for each training epoch
-        save_box_loss(all_train_box_loss_per_epoch, OUT_DIR, title='Box_loss_train')
+        save_box_loss(all_train_box_loss_per_epoch, OUT_DIR, title='Box_loss_train', label='Train Loss')
+        # Save box loss for each validating epoch
+        save_box_loss(all_valid_box_loss_per_epoch, OUT_DIR, title='Box_loss_valid', label='valid Loss')
         # Save class loss for each training epoch 
-        save_cls_loss(all_train_cls_loss_per_epochs, OUT_DIR, title='Cls_loss_train')
-        # Save dfl (Focal Loss) loss for each training epoch
-        save_dfl_loss(all_train_dfl_loss_per_epoch, OUT_DIR, title='Dfl_Loss_train')
+        save_cls_loss(all_train_cls_loss_per_epochs, OUT_DIR, title='Cls_loss_train', label='Train Loss')
+        # Save class loss for each validating epoch 
+        save_cls_loss(all_valid_cls_loss_per_epoch, OUT_DIR, title='Cls_loss_valid', label='Valid Loss')
 
-        # Save box loss for each validation epoch
-        #save_box_loss(all_valid_box_loss_per_epoch, OUT_DIR, title='Box_loss_val')
-        # Save class loss for each validation epoch 
-        #save_cls_loss(all_valid_cls_loss_per_epochs, OUT_DIR, title='Cls_loss_val')
-        # Save dfl (Focal Loss) loss for each validation epoch
-        #save_dfl_loss(all_valid_dfl_loss_per_epoch, OUT_DIR, title='Dfl_loss_val')
-
-        # Save precision for each epoch
-        #save_precision(val_precision, OUT_DIR, title='Metrics-precision(B)')
-        # Save recal for each epoch
-        #save_recal(val_recall, OUT_DIR, title='Metrics-recal(B)')
         # Save mAP50  for each epoch
         save_map50(val_mAP50, OUT_DIR, title='Metrics-mAP50(B)')
         # Save mAP50_95  for each epoch
         save_map50_95(val_mAP50_95, OUT_DIR, title='Metrics-mAP50-95(B)')
         save_precisionB(val_precision_per_epoch, OUT_DIR, title='Metrics-precision(B)')
         save_recallB(val_recall_per_epoch , OUT_DIR, title = 'Metrics-recall(B)')
-        # Save precision recall curve for each epoch
-        #save_precision_recall_curve(coco_evaluator, category_ids, category_names, OUT_DIR, 'Precision-Recall Curve')
-        # Save precision confidence curve for each epoch
-        #save_precision_confidence_curve(coco_evaluator, category_ids, category_names, OUT_DIR, 'Precision-Confidence Curve')
-        # Save recall confidence curve for each epoch
-        #save_recall_confidence_curve(coco_evaluator, category_ids, category_names, OUT_DIR, 'Recall-Confidence Curve')
-        # Save f1 confidence curve for each epoch
-        #save_f1_confidence_curve(coco_evaluator, category_ids, category_names, OUT_DIR, 'F1-Confidence Curve')
+     
         # Save loss plot for epoch-wise list.
         save_loss_plot(
             OUT_DIR, 

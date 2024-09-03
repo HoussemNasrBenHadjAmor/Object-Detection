@@ -92,10 +92,10 @@ def show_tranformed_image(train_loader, device, classes, colors):
             cv2.waitKey(0)
             cv2.destroyAllWindows()
 
-def save_box_loss(loss, OUT_DIR, title):
+def save_box_loss(loss, OUT_DIR, title, label):
     figure = plt.figure(figsize=(10, 5))
     train_ax = figure.add_subplot(1, 1, 1)
-    train_ax.plot(loss, label='Train Loss')
+    train_ax.plot(loss, label=label)
     train_ax.set_title(title)
     train_ax.set_xlabel('Epochs')
     train_ax.set_ylabel('Loss')
@@ -103,10 +103,10 @@ def save_box_loss(loss, OUT_DIR, title):
     figure.savefig(f"{OUT_DIR}/{title}.png")
     plt.close(figure)
 
-def save_cls_loss(loss, OUT_DIR, title):
+def save_cls_loss(loss, OUT_DIR, title, label):
     figure = plt.figure(figsize=(10, 5))
     train_ax = figure.add_subplot(1, 1, 1)
-    train_ax.plot(loss, label='Train Loss')
+    train_ax.plot(loss, label=label)
     train_ax.set_title(title)
     train_ax.set_xlabel('Epochs')
     train_ax.set_ylabel('Loss')
