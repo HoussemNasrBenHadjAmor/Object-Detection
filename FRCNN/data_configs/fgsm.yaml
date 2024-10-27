@@ -1,0 +1,25 @@
+# Base directory for images
+BASE_DIR: "/kaggle/working/football-players-detection-9"
+
+# Ouput directory for augmentation images
+OUTPUT_DIR: "/kaggle/working/football-players-detection-9"
+
+# Ouput directory to save some adversarial images examples
+SAVE_DIR_EXAMPLES_PATH: "/kaggle/working/football-players-detection-9/fgsm_examples"
+
+# Class names.
+CLASSES: ["__background__", "ball", "goalkeeper", "player", "referee"]
+
+# Epsilons value to generate the adversarial image
+
+EPSILONS: [.05]
+
+CLASS_MAPPING: { 1: "ball", 2: "goalkeeper", 3: "player", 4: "referee" }
+
+# Width for image while loading the dataset
+WIDTH: 1920
+
+# Height for image while loading the dataset
+HEIGHT: 1080
+
+MODEL_PATH: "/kaggle/input/frcnn-model-100-epochs/best_model.pth"

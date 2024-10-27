@@ -1,0 +1,16 @@
+# Base directory for images
+BASE_DIR: "/kaggle/working/football-players-detection-9"
+
+# Ouput directory for augmentation images
+OUTPUT_DIR: "/kaggle/working/football-players-detection-9"
+
+# output directory for saving some augmetation images to display later
+SAVE_DIR_EXAMPLES_PATH: "/kaggle/working/football-players-detection-9/examples_augmentation"
+
+CLASS_NAMES: ["ball", "goalkeeper", "player", "referee"]
+
+# ID classes want to augment
+CLASSES_TO_AUGMENT: ["ball", "goalkeeper", "referee"]
+
+# Number of augmetation per image
+NUMBER_OF_AUGMETATION_PER_IMAGE: 10
