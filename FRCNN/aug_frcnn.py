@@ -14,6 +14,11 @@ from xml.etree import ElementTree as et
 from datasets import (create_valid_dataset)
 import random
 import gc
+from PIL import Image, ImageEnhance
+import numpy as np
+import matplotlib.pyplot as plt
+from transformers import pipeline
+
 
 def parse_opt():
     # Construct the argument parser.
@@ -51,27 +56,39 @@ def main (args):
     
     
     augmentation_pipeline = A.Compose([
-    #A.HorizontalFlip(p=0.4),
-    #A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=30, p=0.4),
     A.HorizontalFlip(p=0.4),
     A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=30, p=0.6),
     A.RandomCrop(width=min(WIDTH, 640), height=min(HEIGHT, 640), p=0.6),
     A.CoarseDropout(max_holes=8, max_height=8, max_width=8, p=0.5),
     A.Normalize(mean=(0, 0, 0), std=(1, 1, 1), max_pixel_value=255),  # This standardizes the color scale
-    #A.CoarseDropout(max_holes=8, max_height=8, max_width=8, p=0.4),
-    #A.RandomBrightnessContrast(brightness_limit=0.1, contrast_limit=0.1, p=0.1),
-    #A.CLAHE(clip_limit=2, p=0.2),  # Add CLAHE for better contrast control
-    #A.GaussianBlur(p=0.2),
-    #A.HueSaturationValue(p=0.2),
-    #A.OneOf([
-     #   A.RandomRain(p=0.8),
-     #   A.RandomSnow(p=0.8),
-     #   A.RandomFog(p=1),
-     #   A.RandomSunFlare(p=0.1)
-    #], p=0.8),  # Add weather augmentation with a 30% probability
     ToTensorV2(p=1.0)
     ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['labels'], min_visibility=0.3))
 
+    
+
+    # take the colored image and its depth image as inputs and will generate a new image with an atmospheric fog effect
+    def overlay_transparent_layer(rgb_image, grayscale_image):
+        # Create a white layer with the same size as the input images
+        white_layer = Image.new('RGBA', rgb_image.size, (216,216,216,0))
+    
+        # Convert images to numpy arrays for easier manipulation
+        rgb_array = np.array(rgb_image)
+        grayscale_array = np.array(grayscale_image)
+        white_array = np.array(white_layer)
+    
+        # Calculate alpha values (invert grayscale values)
+        alpha = 255 - grayscale_array
+    
+        # Set the alpha channel of the white layer
+        white_array[:, :, 3] = alpha
+    
+        # Convert back to PIL Image
+        white_layer_transparent = Image.fromarray(white_array, 'RGBA')
+    
+        # Composite the images
+        result = Image.alpha_composite(rgb_image.convert('RGBA'), white_layer_transparent)
+    
+        return result                
 
     def save_augmented_image_and_labels(image, bboxes, class_labels, original_image_path, original_label_path, output_image_dir, output_label_dir, counter, class_mapping):
         image_name = os.path.splitext(os.path.basename(original_image_path))[0]
@@ -229,16 +246,65 @@ def main (args):
             # Save the image into path
             cv2.imwrite(os.path.join(SAVE_DIR_EXAMPLES_PATH, f'random_example_{i}.jpg'), image)
     
+    def apply_haze_and_save_after_applying_and_saving_augmentation(base_dir):
+        # depth estimation using a pre-trained model
+        pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf")
+
+        for folder in ['train', 'valid', 'test']:
+            images_dir = os.path.join(base_dir, folder)
+            #print(f'images_dir : {images_dir}')
+            # Get a list of all images in the directory
+            image_paths = glob.glob(os.path.join(images_dir, '*.jpg')) 
+            #print(f'image_paths : {image_paths}')
+            for image_path in tqdm(image_paths, desc=f'Applying haze for {folder}'):
+                try:
+                    # Get the original_image
+                    original_image = Image.open(image_path).convert("RGBA")
+                    # perform depth estimation
+                    depth = pipe(original_image)["depth"]
+
+                    # reduce saturation
+                    enhancer = ImageEnhance.Color(original_image)
+                    img_2 = enhancer.enhance(0.5)
+                    
+                    # reduce brightness
+                    enhancer2 = ImageEnhance.Brightness(img_2)
+                    img_2 = enhancer2.enhance(0.7)
+                    
+                    # increase contrast
+                    enhancer3 = ImageEnhance.Contrast(img_2)
+                    img_2 = enhancer3.enhance(2.2)
+
+                    #pass the input image (after color adjustments) and the depth image to the function overlay_transparent_layer to add the haze.
+                    result_img = overlay_transparent_layer(img_2, depth)
+
+                    # Convert result image to RGB before saving as JPEG
+                    result_img = result_img.convert("RGB")
+
+                    # remove the old img 
+                    os.remove(image_path)
+
+                    # save the new img 
+                    result_img.save(image_path)
+
+
+                except Exception as e:
+                    print(f'Error during haze application for {image_path}: {e}')
+                    
+            
     aug_examples = []
 
-    aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, CLASSES_TO_AUGMENT, augmentation_pipeline, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, NUMBER_OF_AUGMETATION_PER_IMAGE)
+    #aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, CLASSES_TO_AUGMENT, augmentation_pipeline, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, NUMBER_OF_AUGMETATION_PER_IMAGE)
 
-    aug_examples.extend(aug_array)
+    #aug_examples.extend(aug_array)
 
     # Select 10 random examples
-    random_examples = random.sample(aug_examples, 10 if len(aug_examples) > 10 else len(aug_examples))
+    #random_examples = random.sample(aug_examples, 10 if len(aug_examples) > 10 else len(aug_examples))
 
-    save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH)
+    #save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH)
+
+    apply_haze_and_save_after_applying_and_saving_augmentation(BASE_DIR)
+    
 
 if __name__ == '__main__':
     args = parse_opt()
