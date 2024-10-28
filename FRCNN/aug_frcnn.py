@@ -1,3 +1,4 @@
+%%writefile /kaggle/working/Object-Detection/FRCNN/aug_frcnn.py
 import torch
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -18,6 +19,7 @@ from PIL import Image, ImageEnhance
 import numpy as np
 import matplotlib.pyplot as plt
 from transformers import pipeline
+import random
 
 
 def parse_opt():
@@ -248,15 +250,18 @@ def main (args):
     
     def apply_haze_and_save_after_applying_and_saving_augmentation(base_dir):
         # depth estimation using a pre-trained model
-        pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf")
+        pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=0)
 
         for folder in ['train', 'valid', 'test']:
             images_dir = os.path.join(base_dir, folder)
             #print(f'images_dir : {images_dir}')
             # Get a list of all images in the directory
             image_paths = glob.glob(os.path.join(images_dir, '*.jpg')) 
+            # Select 300 random images from image_paths
+            random_image_paths = random.sample(image_paths, min(500, len(image_paths)))
+            
             #print(f'image_paths : {image_paths}')
-            for image_path in tqdm(image_paths, desc=f'Applying haze for {folder}'):
+            for image_path in tqdm(random_image_paths, desc=f'Applying haze for {folder}'):
                 try:
                     # Get the original_image
                     original_image = Image.open(image_path).convert("RGBA")
@@ -293,15 +298,15 @@ def main (args):
                     
             
     aug_examples = []
+    
+    aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, CLASSES_TO_AUGMENT, augmentation_pipeline, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, NUMBER_OF_AUGMETATION_PER_IMAGE)
 
-    #aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, CLASSES_TO_AUGMENT, augmentation_pipeline, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, NUMBER_OF_AUGMETATION_PER_IMAGE)
-
-    #aug_examples.extend(aug_array)
+    aug_examples.extend(aug_array)
 
     # Select 10 random examples
-    #random_examples = random.sample(aug_examples, 10 if len(aug_examples) > 10 else len(aug_examples))
+    random_examples = random.sample(aug_examples, 10 if len(aug_examples) > 10 else len(aug_examples))
 
-    #save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH)
+    save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH)
 
     apply_haze_and_save_after_applying_and_saving_augmentation(BASE_DIR)
     
