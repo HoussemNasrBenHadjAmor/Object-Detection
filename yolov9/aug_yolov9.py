@@ -75,25 +75,6 @@ def main (args):
 
     encoder = 'vitl' # or 'vits', 'vitb', 'vitg'
 
-    # Link to download the model checkpoint : https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true 
-
-    # Initialize the model
-    model_ckp  = '/teamspace/studios/this_studio/Depth-Anything-V2/depth_anything_v2_vitl.pth' 
-
-    model_depth = DepthAnythingV2(**model_configs[encoder])
-    model_depth.load_state_dict(torch.load(model_ckp, map_location='cpu'))
-    model_depth = model_depth.to(DEVICE).eval()
-
-    np.random.seed(10)
-    eps=0.15
-
-    mean_r, std_r =  0.8, 0.005 ; r = np.random.normal(mean_r, std_r, 1)
-    mean_g, std_g =  0.8, 0.005 ; g = np.random.normal(mean_g, std_g, 1)
-    mean_b, std_b =  0.8, 0.005 ; b = np.random.normal(mean_b, std_b, 1) 
-    mean = np.random.normal(3.25, 0.5, 1)
-
-    atmospheric_light = np.array([r[0], g[0], b[0]])  # Assume white atmospheric light
-
     # Get the image, bboxes and class label for each image in the dataset
     def load_image_and_labels(image_path, label_path, class_names):
         image = cv2.imread(image_path)
