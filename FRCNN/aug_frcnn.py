@@ -322,7 +322,7 @@ def main (args):
                     print(f'Error during haze application for {image_path}: {e}')
                     
     def generate_haze (base_dir , eps, mean, atmospheric_light, model, num_images=5) :
-        for folder in ['test']:
+        for folder in ['train', 'valid', 'test']:
             images_dir = os.path.join(base_dir, folder)
             # Get a list of all images in the directory
             image_paths = glob.glob(os.path.join(images_dir, '*.jpg')) 
