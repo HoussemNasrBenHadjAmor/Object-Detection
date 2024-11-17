@@ -14,6 +14,7 @@ import shutil
 import argparse
 import yaml
 from depth_anything_v2.dpt import DepthAnythingV2
+from scipy.ndimage import gaussian_filter
 
 
 
@@ -173,7 +174,26 @@ def main (args):
 
         return aug_examples
     
-    def generate_haze (base_dir , eps, mean, atmospheric_light, model, num_images=800) :
+    def generate_haze (base_dir, num_images=800) :
+        # Link to download the model checkpoint : https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true 
+
+        # Initialize the model
+        model_ckp  = '/teamspace/studios/this_studio/Depth-Anything-V2/depth_anything_v2_vitl.pth' 
+
+        model_depth = DepthAnythingV2(**model_configs[encoder])
+        model_depth.load_state_dict(torch.load(model_ckp, map_location='cpu'))
+        model_depth = model_depth.to(DEVICE).eval()
+
+        np.random.seed(10)
+        eps=0.15
+
+        mean_r, std_r =  0.8, 0.005 ; r = np.random.normal(mean_r, std_r, 1)
+        mean_g, std_g =  0.8, 0.005 ; g = np.random.normal(mean_g, std_g, 1)
+        mean_b, std_b =  0.8, 0.005 ; b = np.random.normal(mean_b, std_b, 1) 
+        mean = np.random.normal(3.25, 0.5, 1)
+
+        atmospheric_light = np.array([r[0], g[0], b[0]])  # Assume white atmospheric light
+
         for folder in ['train', 'valid', 'test']:
             images_dir = os.path.join(base_dir, folder)
             # Get a list of all images in the directory
@@ -188,7 +208,7 @@ def main (args):
             for image_path in tqdm(selected_image_paths, desc=f'Applying haze for {folder}'):
                 rgb_img = cv2.imread(image_path)
                 rgb_image_normalized = rgb_img.astype(np.float32) / 255.0
-                depth_img = model.infer_image(rgb_img) # HxW raw depth map in numpy
+                depth_img = model_depth.infer_image(rgb_img) # HxW raw depth map in numpy
     
                 depth_img_smoothed = gaussian_filter(depth_img, sigma=1.5)
         
@@ -223,7 +243,7 @@ def main (args):
     
     aug_examples = []
 
-    generate_haze(BASE_DIR, eps, mean, atmospheric_light, model_depth)
+    generate_haze(BASE_DIR)
 
     #aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, augmentation_pipeline, CLASSES_TO_AUGMENT, NUMBER_OF_AUGMETATION_PER_IMAGE, CLASS_NAMES)
 
