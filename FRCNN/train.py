@@ -242,8 +242,16 @@ def main(args):
                 val_map = checkpoint['val_map']
             if checkpoint['val_map_05']:
                 val_map_05 = checkpoint['val_map_05']
-        
+
+
+    # Move model to the first device and wrap with DataParallel
+    #device_ids = [0, 1]  # Assuming you have two GPUs with IDs 0 and 1
+
+    
+
     print(model)
+    #model = model.to('cuda:0')  # Move model to GPU 0
+    #model = torch.nn.DataParallel(model, device_ids=device_ids)  # Wrap the model
     model = model.to(DEVICE)
     # Total parameters and trainable parameters.
     total_params = sum(p.numel() for p in model.parameters())

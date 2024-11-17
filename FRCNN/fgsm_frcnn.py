@@ -213,9 +213,10 @@ def main (args):
                 # Check if adv_pred and target are the same
                 result = check_pred_target(adv_outputs , target, False)
 
+                # Means the adv_pred and target are not the same
                 if result != None:
-                    # Means the adv_pred and target are not the same
-                    adv_examples.append(adv_image)
+                    if len(adv_examples) < 100:
+                        adv_examples.append(adv_image)
                     save_fgsm_image_label(output_dir, adv_image, target, folder, class_mapping)
                 else :
                     # Means the adv_pred and labels are the same

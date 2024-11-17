@@ -1,10 +1,9 @@
-%%writefile /kaggle/working/Object-Detection/FRCNN/aug_frcnn.py
 import torch
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import numpy as np
 import cv2
-import numpy as np
+from scipy.ndimage import gaussian_filter
 import os
 import glob as glob
 import yaml
@@ -19,7 +18,7 @@ from PIL import Image, ImageEnhance
 import numpy as np
 import matplotlib.pyplot as plt
 from transformers import pipeline
-import random
+from depth_anything_v2.dpt import DepthAnythingV2
 
 
 def parse_opt():
@@ -66,6 +65,35 @@ def main (args):
     ToTensorV2(p=1.0)
     ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['labels'], min_visibility=0.3))
 
+    DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
+
+    model_configs = {
+        'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
+        'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
+        'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
+        'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]}
+    }
+
+    encoder = 'vitl' # or 'vits', 'vitb', 'vitg'
+
+    # Link to download the model checkpoint : https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true 
+
+    # Initialize the model
+    model_ckp  = '/teamspace/studios/this_studio/Depth-Anything-V2/depth_anything_v2_vitl.pth' 
+
+    model_depth = DepthAnythingV2(**model_configs[encoder])
+    model_depth.load_state_dict(torch.load(model_ckp, map_location='cpu'))
+    model_depth = model_depth.to(DEVICE).eval()
+
+    np.random.seed(10)
+    eps=0.15
+
+    mean_r, std_r =  0.8, 0.005 ; r = np.random.normal(mean_r, std_r, 1)
+    mean_g, std_g =  0.8, 0.005 ; g = np.random.normal(mean_g, std_g, 1)
+    mean_b, std_b =  0.8, 0.005 ; b = np.random.normal(mean_b, std_b, 1) 
+    mean = np.random.normal(3.25, 0.5, 1)
+
+    atmospheric_light = np.array([r[0], g[0], b[0]])  # Assume white atmospheric light
     
 
     # take the colored image and its depth image as inputs and will generate a new image with an atmospheric fog effect
@@ -250,18 +278,15 @@ def main (args):
     
     def apply_haze_and_save_after_applying_and_saving_augmentation(base_dir):
         # depth estimation using a pre-trained model
-        pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf", device=0)
+        pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Base-hf")
 
         for folder in ['train', 'valid', 'test']:
             images_dir = os.path.join(base_dir, folder)
             #print(f'images_dir : {images_dir}')
             # Get a list of all images in the directory
             image_paths = glob.glob(os.path.join(images_dir, '*.jpg')) 
-            # Select 300 random images from image_paths
-            random_image_paths = random.sample(image_paths, min(500, len(image_paths)))
-            
             #print(f'image_paths : {image_paths}')
-            for image_path in tqdm(random_image_paths, desc=f'Applying haze for {folder}'):
+            for image_path in tqdm(image_paths, desc=f'Applying haze for {folder}'):
                 try:
                     # Get the original_image
                     original_image = Image.open(image_path).convert("RGBA")
@@ -296,19 +321,69 @@ def main (args):
                 except Exception as e:
                     print(f'Error during haze application for {image_path}: {e}')
                     
+    def generate_haze (base_dir , eps, mean, atmospheric_light, model, num_images=5) :
+        for folder in ['test']:
+            images_dir = os.path.join(base_dir, folder)
+            # Get a list of all images in the directory
+            image_paths = glob.glob(os.path.join(images_dir, '*.jpg')) 
+
+            # Randomly select 800 images (or fewer if the folder contains less than 800 images)
+            if len(image_paths) > num_images:
+                selected_image_paths = random.sample(image_paths, num_images)
+            else:
+                selected_image_paths = image_paths
+
+            for image_path in tqdm(selected_image_paths, desc=f'Applying haze for {folder}'):
+                rgb_img = cv2.imread(image_path)
+                rgb_image_normalized = rgb_img.astype(np.float32) / 255.0
+                depth_img = model.infer_image(rgb_img) # HxW raw depth map in numpy
+    
+                depth_img_smoothed = gaussian_filter(depth_img, sigma=1.5)
+        
+                # Clip the values to a maximum of 255
+                depth_img_clipped = np.clip(depth_img_smoothed, 0, 255).astype(np.uint8)
+
+                inverted_depth_img = (1 - depth_img_clipped.astype(np.float32) / 250.0) + eps
+        
+                beta = np.random.normal(mean[0], 0.05, 1)
+                beta[beta<0] = 0.01
+                transmission_map = np.exp(-beta[0] * inverted_depth_img)
+                # Compute the hazy image I(x) using the formula
+                hazed_image = rgb_image_normalized * transmission_map[:, :, np.newaxis] + atmospheric_light * (1 - transmission_map[:, :, np.newaxis])
+                hazed_image = (hazed_image * 255).astype(np.uint8)
+
+                # Save the hazed image under the same path but append '_hazed'
+                folder_path, file_name = os.path.split(image_path)
+                file_name_without_ext, ext = os.path.splitext(file_name)
+                hazed_image_path = os.path.join(folder_path, f"{file_name_without_ext}_hazed{ext}")
             
+                cv2.imwrite(hazed_image_path, hazed_image)
+
+                # Handle the associated XML file
+                xml_file_path = os.path.join(folder_path, f"{file_name_without_ext}.xml")
+                if os.path.exists(xml_file_path):
+                    hazed_xml_path = os.path.join(folder_path, f"{file_name_without_ext}_hazed.xml")
+                    with open(xml_file_path, 'r') as xml_file:
+                        xml_content = xml_file.read()
+                    # Save the XML file with '_hazed' appended
+                    with open(hazed_xml_path, 'w') as hazed_xml_file:
+                        hazed_xml_file.write(xml_content)
+
+
     aug_examples = []
     
-    aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, CLASSES_TO_AUGMENT, augmentation_pipeline, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, NUMBER_OF_AUGMETATION_PER_IMAGE)
+    generate_haze(BASE_DIR, eps, mean, atmospheric_light, model_depth)
 
-    aug_examples.extend(aug_array)
+    #aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, CLASSES_TO_AUGMENT, augmentation_pipeline, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, NUMBER_OF_AUGMETATION_PER_IMAGE)
+
+    #aug_examples.extend(aug_array)
 
     # Select 10 random examples
-    random_examples = random.sample(aug_examples, 10 if len(aug_examples) > 10 else len(aug_examples))
+    #random_examples = random.sample(aug_examples, 10 if len(aug_examples) > 10 else len(aug_examples))
 
-    save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH)
+    #save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH)
 
-    apply_haze_and_save_after_applying_and_saving_augmentation(BASE_DIR)
+    #apply_haze_and_save_after_applying_and_saving_augmentation(BASE_DIR)
     
 
 if __name__ == '__main__':
