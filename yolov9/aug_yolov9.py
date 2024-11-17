@@ -169,7 +169,7 @@ def main (args):
                         augmented_class_labels = augmented['class_labels']
 
                         if augmented_bboxes and augmented_class_labels:
-                            aug_examples.append(augmented_image)
+                            #aug_examples.append(augmented_image)
                             save_augmented_image_and_labels(augmented_image, augmented_bboxes, augmented_class_labels, image_path, label_path, output_image_dir, output_label_dir, i, class_names)
 
         return aug_examples
