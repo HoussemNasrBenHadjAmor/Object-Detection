@@ -76,24 +76,7 @@ def main (args):
 
     encoder = 'vitl' # or 'vits', 'vitb', 'vitg'
 
-    # Link to download the model checkpoint : https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true 
-
-    # Initialize the model
-    model_ckp  = '/teamspace/studios/this_studio/Depth-Anything-V2/depth_anything_v2_vitl.pth' 
-
-    model_depth = DepthAnythingV2(**model_configs[encoder])
-    model_depth.load_state_dict(torch.load(model_ckp, map_location='cpu'))
-    model_depth = model_depth.to(DEVICE).eval()
-
-    np.random.seed(10)
-    eps=0.15
-
-    mean_r, std_r =  0.8, 0.005 ; r = np.random.normal(mean_r, std_r, 1)
-    mean_g, std_g =  0.8, 0.005 ; g = np.random.normal(mean_g, std_g, 1)
-    mean_b, std_b =  0.8, 0.005 ; b = np.random.normal(mean_b, std_b, 1) 
-    mean = np.random.normal(3.25, 0.5, 1)
-
-    atmospheric_light = np.array([r[0], g[0], b[0]])  # Assume white atmospheric light
+    
     
 
     # take the colored image and its depth image as inputs and will generate a new image with an atmospheric fog effect
@@ -193,8 +176,6 @@ def main (args):
             y=0
             image_dir = os.path.join(base_dir, folder)
             label_dir = os.path.join(base_dir, folder)
-            
-            print(f'We are in the {folder} folder to proccess with images')
 
             dataset = create_valid_dataset(image_dir, label_dir, width, height, classes)
 
@@ -321,7 +302,25 @@ def main (args):
                 except Exception as e:
                     print(f'Error during haze application for {image_path}: {e}')
                     
-    def generate_haze (base_dir , eps, mean, atmospheric_light, model, num_images=5) :
+    def generate_haze (base_dir , eps, mean, atmospheric_light, model, num_images=800) :
+        # Link to download the model checkpoint : https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true 
+
+        # Initialize the model
+        model_ckp  = '/teamspace/studios/this_studio/Depth-Anything-V2/depth_anything_v2_vitl.pth' 
+
+        model_depth = DepthAnythingV2(**model_configs[encoder])
+        model_depth.load_state_dict(torch.load(model_ckp, map_location='cpu'))
+        model_depth = model_depth.to(DEVICE).eval()
+
+        np.random.seed(10)
+        eps=0.15
+
+        mean_r, std_r =  0.8, 0.005 ; r = np.random.normal(mean_r, std_r, 1)
+        mean_g, std_g =  0.8, 0.005 ; g = np.random.normal(mean_g, std_g, 1)
+        mean_b, std_b =  0.8, 0.005 ; b = np.random.normal(mean_b, std_b, 1) 
+        mean = np.random.normal(3.25, 0.5, 1)
+
+        atmospheric_light = np.array([r[0], g[0], b[0]])  # Assume white atmospheric light
         for folder in ['train', 'valid', 'test']:
             images_dir = os.path.join(base_dir, folder)
             # Get a list of all images in the directory
@@ -372,9 +371,9 @@ def main (args):
 
     aug_examples = []
     
-    generate_haze(BASE_DIR, eps, mean, atmospheric_light, model_depth)
+    #generate_haze(BASE_DIR, eps, mean, atmospheric_light, model_depth)
 
-    #aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, CLASSES_TO_AUGMENT, augmentation_pipeline, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, NUMBER_OF_AUGMETATION_PER_IMAGE)
+    aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, CLASSES_TO_AUGMENT, augmentation_pipeline, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, NUMBER_OF_AUGMETATION_PER_IMAGE)
 
     #aug_examples.extend(aug_array)
 
