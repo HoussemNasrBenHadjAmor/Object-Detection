@@ -105,8 +105,8 @@ def main (args):
 
     def save_augmented_image_and_labels(image, bboxes, class_labels, original_image_path, original_label_path, output_image_dir, output_label_dir, counter, class_mapping):
         image_name = os.path.splitext(os.path.basename(original_image_path))[0]
-        augmented_image_name = f"{image_name}_aug.jpg"
-        augmented_label_name = f"{image_name}_aug.xml"
+        augmented_image_name = f"{image_name}_aug_{counter}.jpg"
+        augmented_label_name = f"{image_name}_aug_{counter}.xml"
     
         augmented_image_path = os.path.join(output_image_dir, augmented_image_name)
         augmented_label_path = os.path.join(output_label_dir, augmented_label_name)
