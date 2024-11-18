@@ -3,7 +3,7 @@ import numpy as np
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import os
-from glob import glob
+import glob
 from tqdm import tqdm
 import torch
 import torchvision.transforms as transforms
@@ -95,8 +95,8 @@ def main (args):
         image_name = os.path.splitext(os.path.basename(original_image_path))[0]
         label_name = os.path.splitext(os.path.basename(original_label_path))[0]
 
-        augmented_image_path = os.path.join(output_image_dir, f"{image_name}_aug_{counter}.jpg")
-        augmented_label_path = os.path.join(output_label_dir, f"{label_name}_aug_{counter}.txt")
+        augmented_image_path = os.path.join(output_image_dir, f"{image_name}_aug.jpg")
+        augmented_label_path = os.path.join(output_label_dir, f"{label_name}_aug.txt")
 
         # Convert the tensor image back to a NumPy array
         if torch.is_tensor(image):
@@ -136,7 +136,7 @@ def main (args):
             os.makedirs(output_image_dir, exist_ok=True)
             os.makedirs(output_label_dir, exist_ok=True)
 
-            for label_file in tqdm(os.listdir(label_dir)):
+            for label_file in tqdm(os.listdir(label_dir), desc=f'Processing augmetation for {folder} images'):
                 label_path = os.path.join(label_dir, label_file)
                 image_path = os.path.join(image_dir, label_file.replace('.txt', '.jpg'))
 
@@ -159,7 +159,7 @@ def main (args):
         # Link to download the model checkpoint : https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true 
 
         # Initialize the model
-        model_ckp  = '/teamspace/studios/this_studio/Depth-Anything-V2/depth_anything_v2_vitl.pth' 
+        model_ckp  = '/teamspace/studios/this_studio/depth_anything_v2_vitl.pth' 
 
         model_depth = DepthAnythingV2(**model_configs[encoder])
         model_depth.load_state_dict(torch.load(model_ckp, map_location='cpu'))
@@ -178,7 +178,7 @@ def main (args):
         for folder in ['train', 'valid', 'test']:
             images_dir = os.path.join(base_dir, folder)
             # Get a list of all images in the directory
-            image_paths = glob.glob(os.path.join(images_dir, '*.jpg')) 
+            image_paths = glob.glob(os.path.join(f'{images_dir}/images', '*.jpg'))
 
             # Randomly select 800 images (or fewer if the folder contains less than 800 images)
             if len(image_paths) > num_images:
@@ -212,21 +212,21 @@ def main (args):
             
                 cv2.imwrite(hazed_image_path, hazed_image)
 
-                # Handle the associated XML file
-                xml_file_path = os.path.join(folder_path, f"{file_name_without_ext}.xml")
-                if os.path.exists(xml_file_path):
-                    hazed_xml_path = os.path.join(folder_path, f"{file_name_without_ext}_hazed.xml")
-                    with open(xml_file_path, 'r') as xml_file:
-                        xml_content = xml_file.read()
-                    # Save the XML file with '_hazed' appended
-                    with open(hazed_xml_path, 'w') as hazed_xml_file:
-                        hazed_xml_file.write(xml_content)
+                # Handle the associated .txt file
+                txt_file_path = os.path.join(images_dir, 'labels', f"{file_name_without_ext}.txt")
+                if os.path.exists(txt_file_path):
+                    hazed_txt_path = os.path.join(images_dir, 'labels', f"{file_name_without_ext}_hazed.txt")
+                    with open(txt_file_path, 'r') as txt_file:
+                        txt_content = txt_file.read()
+                    # Save the .txt file with '_hazed' appended
+                    with open(hazed_txt_path, 'w') as hazed_txt_file:
+                        hazed_txt_file.write(txt_content)
     
     aug_examples = []
 
     generate_haze(BASE_DIR)
 
-    #aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, augmentation_pipeline, CLASSES_TO_AUGMENT, NUMBER_OF_AUGMETATION_PER_IMAGE, CLASS_NAMES)
+    aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, augmentation_pipeline, CLASSES_TO_AUGMENT, NUMBER_OF_AUGMETATION_PER_IMAGE, CLASS_NAMES)
 
     #aug_examples.extend(aug_array)
 
