@@ -126,7 +126,7 @@ def main (args):
     def process_augmentation(base_dir, output_dir, augmentation_pipeline, classes_to_augment, NUMBER_OF_AUGMETATION_PER_IMAGE, class_names):
         aug_examples = []
         # Process each directory
-        for folder in ['tarin', 'valid', 'test']:
+        for folder in ['train', 'valid', 'test']:
             image_dir = os.path.join(base_dir, folder, 'images')
             label_dir = os.path.join(base_dir, folder, 'labels')
 
