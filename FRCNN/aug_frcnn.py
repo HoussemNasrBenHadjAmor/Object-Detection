@@ -105,8 +105,8 @@ def main (args):
 
     def save_augmented_image_and_labels(image, bboxes, class_labels, original_image_path, original_label_path, output_image_dir, output_label_dir, counter, class_mapping):
         image_name = os.path.splitext(os.path.basename(original_image_path))[0]
-        augmented_image_name = f"{image_name}_aug_{counter}.jpg"
-        augmented_label_name = f"{image_name}_aug_{counter}.xml"
+        augmented_image_name = f"{image_name}_aug.jpg"
+        augmented_label_name = f"{image_name}_aug.xml"
     
         augmented_image_path = os.path.join(output_image_dir, augmented_image_name)
         augmented_label_path = os.path.join(output_label_dir, augmented_label_name)
@@ -220,8 +220,8 @@ def main (args):
                                     augmented_image = augmented_image.permute(1, 2, 0).cpu().numpy()
 
                                 if len(augmented_bboxes) > 0 and len(augmented_class_labels) > 0:
-                                    if len(aug_examples) < 100:
-                                        aug_examples.append(augmented_image)
+                                    #if len(aug_examples) < 100:
+                                     #   aug_examples.append(augmented_image)
                                     save_augmented_image_and_labels(augmented_image, augmented_bboxes, augmented_class_labels, image_path, label_path, output_image_dir, output_label_dir, i, class_mapping)
                                 else:
                                     x+=1
@@ -302,7 +302,7 @@ def main (args):
                 except Exception as e:
                     print(f'Error during haze application for {image_path}: {e}')
                     
-    def generate_haze (base_dir , eps, mean, atmospheric_light, model, num_images=800) :
+    def generate_haze (base_dir, num_images=800) :
         # Link to download the model checkpoint : https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true 
 
         # Initialize the model
@@ -335,7 +335,7 @@ def main (args):
             for image_path in tqdm(selected_image_paths, desc=f'Applying haze for {folder}'):
                 rgb_img = cv2.imread(image_path)
                 rgb_image_normalized = rgb_img.astype(np.float32) / 255.0
-                depth_img = model.infer_image(rgb_img) # HxW raw depth map in numpy
+                depth_img = model_depth.infer_image(rgb_img) # HxW raw depth map in numpy
     
                 depth_img_smoothed = gaussian_filter(depth_img, sigma=1.5)
         
@@ -368,10 +368,9 @@ def main (args):
                     with open(hazed_xml_path, 'w') as hazed_xml_file:
                         hazed_xml_file.write(xml_content)
 
-
     aug_examples = []
     
-    #generate_haze(BASE_DIR, eps, mean, atmospheric_light, model_depth)
+    #generate_haze(BASE_DIR)
 
     aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, CLASSES_TO_AUGMENT, augmentation_pipeline, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, NUMBER_OF_AUGMETATION_PER_IMAGE)
 
