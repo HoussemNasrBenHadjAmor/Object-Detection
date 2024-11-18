@@ -59,7 +59,7 @@ def main (args):
     A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=30, p=0.6),
     A.RandomCrop(width=min(WIDTH, 640), height=min(HEIGHT, 640), p=0.6),
     A.CoarseDropout(max_holes=8, max_height=8, max_width=8, p=0.5),
-    A.Normalize(mean=(0, 0, 0), std=(1, 1, 1), max_pixel_value=255),  # This standardizes the color scale
+    #A.Normalize(mean=(0, 0, 0), std=(1, 1, 1), max_pixel_value=255),  # This standardizes the color scale
     ToTensorV2(p=1.0)
     ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels'], min_visibility=0.3))
 
@@ -95,8 +95,8 @@ def main (args):
         image_name = os.path.splitext(os.path.basename(original_image_path))[0]
         label_name = os.path.splitext(os.path.basename(original_label_path))[0]
 
-        augmented_image_path = os.path.join(output_image_dir, f"{image_name}_aug.jpg")
-        augmented_label_path = os.path.join(output_label_dir, f"{label_name}_aug.txt")
+        augmented_image_path = os.path.join(output_image_dir, f"{image_name}_aug_{counter}.jpg")
+        augmented_label_path = os.path.join(output_label_dir, f"{label_name}_aug_{counter}.txt")
 
         # Convert the tensor image back to a NumPy array
         if torch.is_tensor(image):
@@ -126,7 +126,7 @@ def main (args):
     def process_augmentation(base_dir, output_dir, augmentation_pipeline, classes_to_augment, NUMBER_OF_AUGMETATION_PER_IMAGE, class_names):
         aug_examples = []
         # Process each directory
-        for folder in ['train', 'valid', 'test']:
+        for folder in ['tarin', 'valid', 'test']:
             image_dir = os.path.join(base_dir, folder, 'images')
             label_dir = os.path.join(base_dir, folder, 'labels')
 
