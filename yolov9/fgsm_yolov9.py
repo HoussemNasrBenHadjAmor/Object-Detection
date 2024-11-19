@@ -159,8 +159,8 @@ def main(args):
     
         # Generate a random image_name using UUID    
         random_filename = str(uuid.uuid4())
-        image_name = random_filename + '.jpg'
-        path_name = random_filename + '.txt'
+        image_name = random_filename + '_fgsm' + '.jpg'
+        path_name = random_filename + '_fgsm' + '.txt'
         fsgm_image_path = os.path.join(image_dir, image_name)    
         fsgm_label_path = os.path.join(label_dir, path_name)    
 
