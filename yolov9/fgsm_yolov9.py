@@ -155,7 +155,7 @@ def main(args):
         label_dir = os.path.join(output_dir, folder, 'labels')
 
         os.makedirs(image_dir, exist_ok=True)
-        os.makedirs(label_dir, exist_ok=True)    
+        os.makedirs(label_dir, exist_ok=True)
     
         # Generate a random image_name using UUID    
         random_filename = str(uuid.uuid4())
@@ -220,7 +220,7 @@ def main(args):
 
                 if result is not None:
                     # Means the adv_pred and target are not the same
-                    adv_examples.append(adv_image)
+                    #adv_examples.append(adv_image)
                     save_fgsm_image_label(output_dir, adv_image, target, folder)
                 else:
                     # Means the adv_pred and labels are the same
@@ -250,12 +250,12 @@ def main(args):
     # Run test for each epsilon
     for eps in EPSILONS:
         _, ex = create_adversarial_attack(eps, BASE_DIR, IMGSZ, BATCH_SIZE, OUTPUT_DIR)
-        adv_examples.extend(ex)
+        #adv_examples.extend(ex)
 
     # Select 10 random examples
-    random_examples = random.sample(adv_examples, 10 if len(adv_examples) > 10 else len(adv_examples))
+    #random_examples = random.sample(adv_examples, 10 if len(adv_examples) > 10 else len(adv_examples))
 
-    save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH)
+    #save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH)
 
     print('Generation adversarial attack has completed successfully')
 
