@@ -129,7 +129,7 @@ def main(args):
     def check_pred_target(output, target, skip):
         output_shape = output[0].shape[0]
         target_shape = len(target)
-        if output_shape != target_shape:
+        if output_shape != target_shape or target_shape == 0:
             if skip:
                 return None
             else:
