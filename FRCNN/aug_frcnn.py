@@ -370,7 +370,7 @@ def main (args):
 
     aug_examples = []
     
-    #generate_haze(BASE_DIR)
+    generate_haze(BASE_DIR)
 
     aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, CLASSES_TO_AUGMENT, augmentation_pipeline, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, NUMBER_OF_AUGMETATION_PER_IMAGE)
 
