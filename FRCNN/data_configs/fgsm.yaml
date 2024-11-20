@@ -8,7 +8,7 @@ OUTPUT_DIR: "/kaggle/working/football-players-detection-9"
 SAVE_DIR_EXAMPLES_PATH: "/kaggle/working/football-players-detection-9/fgsm_examples"
 
 # Class names.
-CLASSES: ["__background__", "ball", "goalkeeper", "player", "referee"]
+CLASSES: ["__background__", "car", "people"]
 
 # Epsilons value to generate the adversarial image
 
