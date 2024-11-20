@@ -181,9 +181,9 @@ def main(args):
     def create_adversarial_attack(epsilon, base_dir, imgsz, batch_size, output_dir):
         # Process the entire validation dataset
         adv_examples = []
-        correct = 0
 
         for folder  in ['train', 'valid', 'test']:
+            correct = 0
             image_dir = os.path.join(base_dir, folder)
             _, dataset = create_dataloader(image_dir , imgsz, batch_size, 32)
 

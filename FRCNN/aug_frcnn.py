@@ -169,8 +169,6 @@ def main (args):
         etree.ElementTree(anno_tree).write(augmented_label_path, pretty_print=True)
 
     def process_augmentation(base_dir, output_dir, classes_to_augment, augmentation_pipeline, width, height, classes, class_mapping, number_of_augmetation):
-        aug_examples = []
-       
         for folder in ['train', 'valid', 'test']:
             x= 0
             y=0
@@ -241,7 +239,6 @@ def main (args):
 
             print(f'Number of ignored images due to no labels or bboxes : {x}')
             print(f'Number of images which are not in the classes_to_augment : {y}')
-        return aug_examples
 
     def save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH):
         os.makedirs(SAVE_DIR_EXAMPLES_PATH, exist_ok=True)  
@@ -302,7 +299,7 @@ def main (args):
                 except Exception as e:
                     print(f'Error during haze application for {image_path}: {e}')
                     
-    def generate_haze (base_dir, num_images=800) :
+    def generate_haze (base_dir, num_images=400) :
         # Link to download the model checkpoint : https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true 
 
         # Initialize the model
@@ -368,11 +365,10 @@ def main (args):
                     with open(hazed_xml_path, 'w') as hazed_xml_file:
                         hazed_xml_file.write(xml_content)
 
-    aug_examples = []
     
     generate_haze(BASE_DIR)
 
-    aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, CLASSES_TO_AUGMENT, augmentation_pipeline, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, NUMBER_OF_AUGMETATION_PER_IMAGE)
+    process_augmentation(BASE_DIR, OUTPUT_DIR, CLASSES_TO_AUGMENT, augmentation_pipeline, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, NUMBER_OF_AUGMETATION_PER_IMAGE)
 
     #aug_examples.extend(aug_array)
 
