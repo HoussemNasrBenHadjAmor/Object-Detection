@@ -1,11 +1,11 @@
 # Images and labels direcotry should be relative to train.py
-TRAIN_DIR_IMAGES: "C:/Object Detection/FRCNN/peoples_cars_drone_no_attack_frcnn_ssd/train"
-TRAIN_DIR_LABELS: "C:/Object Detection/FRCNN/peoples_cars_drone_no_attack_frcnn_ssd/train"
-VALID_DIR_IMAGES: "C:/Object Detection/FRCNN/peoples_cars_drone_no_attack_frcnn_ssd/valid"
-VALID_DIR_LABELS: "C:/Object Detection/FRCNN/peoples_cars_drone_no_attack_frcnn_ssd/valid"
+TRAIN_DIR_IMAGES: "/kaggle/working/yolov5-peoples&cars-8/train"
+TRAIN_DIR_LABELS: "/kaggle/working/yolov5-peoples&cars-8/train"
+VALID_DIR_IMAGES: "/kaggle/working/yolov5-peoples&cars-8/valid"
+VALID_DIR_LABELS: "/kaggle/working/yolov5-peoples&cars-8/valid"
 
 # Class names.
-CLASSES: ['__background__', 'car', 'people']
+CLASSES: ["__background__", "car", "people"]
 
 # Number of classes (object classes + 1 for background class in Faster RCNN).
 NC: 3

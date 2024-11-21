@@ -46,7 +46,7 @@ def parse_opt():
     # Construct the argument parser.
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-m', '--model', default='ssd300',
+        '-m', '--model', default='fasterrcnn_resnet50_fpn',
         help='name of the model'
     )
     parser.add_argument(
@@ -73,10 +73,6 @@ def parse_opt():
     parser.add_argument(
         '-ims', '--img-size', dest='img_size', default=640, type=int, 
         help='image size to feed to the network'
-    )
-    parser.add_argument(
-        '-size', '--size', dest='size', default=512, type=int, 
-        help='model size : either 512 or 300 supported'
     )
     parser.add_argument(
         '-pn', '--project-name', default=None, type=str, dest='project_name',
@@ -124,7 +120,6 @@ def main(args):
     TRAIN_DIR_LABELS = data_configs['TRAIN_DIR_LABELS']
     VALID_DIR_IMAGES = data_configs['VALID_DIR_IMAGES']
     VALID_DIR_LABELS = data_configs['VALID_DIR_LABELS']
-    SIZE = args['size']
     CLASSES = data_configs['CLASSES']
     NUM_CLASSES = data_configs['NC']
     NUM_WORKERS = args['workers']
@@ -135,10 +130,6 @@ def main(args):
     VISUALIZE_TRANSFORMED_IMAGES = args['vis_transformed']
     OUT_DIR = set_training_dir(args['project_name'])
     COLORS = np.random.uniform(0, 1, size=(len(CLASSES), 3))
-
-    # Check the condition
-    if args["size"] not in [300, 512]:
-        raise ValueError(f"Invalid size: {args['size']}. Allowed sizes are 300 or 512.")
     # Set logging file.
     set_log(OUT_DIR)
     # writer = set_summary_writer(OUT_DIR)
@@ -146,8 +137,6 @@ def main(args):
     # Model configurations
     IMAGE_WIDTH = args['img_size']
     IMAGE_HEIGHT = args['img_size']
-    
-    print(f'IMAGE_WIDTH : {IMAGE_WIDTH}')
     
     train_dataset = create_train_dataset(
         TRAIN_DIR_IMAGES, TRAIN_DIR_LABELS,
@@ -169,8 +158,10 @@ def main(args):
 
     # Initialize the Averager class.
     train_loss_hist = Averager()
+
     # Intiialize the Averager valid class.
     valid_loss_hist = Averager()
+
     # Train and validation loss lists to store loss values of all
     # iterations till ena and plot graphs for all iterations.
     train_loss_list = []
@@ -204,24 +195,34 @@ def main(args):
     if args['weights'] is None:
         print('Building model from scratch...')
         build_model = create_model[args['model']]
-        model = build_model(num_classes=NUM_CLASSES, size=SIZE)
+        model = build_model(num_classes=NUM_CLASSES, pretrained=True)
 
-        # Load pretrained weights if path is provided.
+    # Load pretrained weights if path is provided.
     if args['weights'] is not None:
         print('Loading pretrained weights...')
+        
         # Load the pretrained checkpoint.
-        checkpoint = torch.load(args['weights'], map_location=DEVICE)
-        #print(f'checkpoint : {checkpoint}')
+        checkpoint = torch.load(args['weights'], map_location=DEVICE) 
+        keys = list(checkpoint['model_state_dict'].keys())
         ckpt_state_dict = checkpoint['model_state_dict']
-        #print(f'ckpt_state_dict : {ckpt_state_dict}')
-        # Get the classes and classes number from the checkpoint
-        NUM_CLASSES = checkpoint['config']['NC']
+        # Get the number of classes from the loaded checkpoint.
+        old_classes = ckpt_state_dict['roi_heads.box_predictor.cls_score.weight'].shape[0]
 
         # Build the new model with number of classes same as checkpoint.
         build_model = create_model[args['model']]
-        model = build_model(num_classes=NUM_CLASSES, size=SIZE)
+        model = build_model(num_classes=old_classes)
         # Load weights.
         model.load_state_dict(ckpt_state_dict)
+
+        # Change output features for class predictor and box predictor
+        # according to current dataset classes.
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        model.roi_heads.box_predictor.cls_score = torch.nn.Linear(
+            in_features=in_features, out_features=NUM_CLASSES, bias=True
+        )
+        model.roi_heads.box_predictor.bbox_pred = torch.nn.Linear(
+            in_features=in_features, out_features=NUM_CLASSES*4, bias=True
+        )
 
         if args['resume_training']:
             print('RESUMING TRAINING...')
@@ -241,8 +242,16 @@ def main(args):
                 val_map = checkpoint['val_map']
             if checkpoint['val_map_05']:
                 val_map_05 = checkpoint['val_map_05']
-        
+
+
+    # Move model to the first device and wrap with DataParallel
+    #device_ids = [0, 1]  # Assuming you have two GPUs with IDs 0 and 1
+
+    
+
     print(model)
+    #model = model.to('cuda:0')  # Move model to GPU 0
+    #model = torch.nn.DataParallel(model, device_ids=device_ids)  # Wrap the model
     model = model.to(DEVICE)
     # Total parameters and trainable parameters.
     total_params = sum(p.numel() for p in model.parameters())
@@ -253,9 +262,8 @@ def main(args):
     # Get the model parameters.
     params = [p for p in model.parameters() if p.requires_grad]
     # Define the optimizer.
-    #optimizer = torch.optim.SGD(params, lr=0.0001, momentum=0.9,weight_decay=0.0005, nesterov=True)
     optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, nesterov=True)
-    #optimizer = torch.optim.AdamW(params, lr=0.001, weight_decay=0.005)
+    # optimizer = torch.optim.AdamW(params, lr=0.0001, weight_decay=0.0005)
     if args['resume_training']: 
         # LOAD THE OPTIMIZER STATE DICTIONARY FROM THE CHECKPOINT.
         print('Loading optimizer state dictionary...')
@@ -277,7 +285,9 @@ def main(args):
     save_best_model = SaveBestModel()
 
     for epoch in range(start_epochs, NUM_EPOCHS):
+        # Reset the tain and loss hist values
         train_loss_hist.reset()
+        valid_loss_hist.reset()
 
         _,  train_box_loss_per_epoch, \
              train_cls_loss_per_epochs, \
@@ -297,6 +307,7 @@ def main(args):
             scheduler=scheduler
         )
 
+
         coco_evaluator, stats, val_pred_image, category_ids, category_names, tp, conf, pred_cls, target_cls, fn_count = evaluate(
             model, 
             valid_loader, 
@@ -314,6 +325,7 @@ def main(args):
         val_precision_per_epoch.append(precision)
         val_recall_per_epoch.append(recall)
 
+        # Append the current epoch's batch-wise losses to the `train_loss_list`.
         train_loss_list.extend(batch_loss_list)
         #valid_loss_list.extend(valid_batch_loss_list)
         loss_cls_list.extend(batch_loss_cls_list)
@@ -324,7 +336,6 @@ def main(args):
         #valid_loss_objectness_list.extend(valid_batch_loss_objectness_list)
         loss_rpn_list.extend(batch_loss_rpn_list)
         #valid_loss_rpn_list.extend(valid_batch_loss_rpn_list)
-
         # Append curent epoch's average loss to `train_loss_list_epoch`.
         val_map_05.append(stats[1])
         val_map.append(stats[0])
@@ -333,8 +344,11 @@ def main(args):
         val_mAP50.append(stats[1])
         val_mAP50_95.append(stats[0])
         all_train_box_loss_per_epoch.extend(train_box_loss_per_epoch)
+        #all_valid_box_loss_per_epoch.extend(valid_box_loss_per_epoch)
         all_train_cls_loss_per_epochs.extend(train_cls_loss_per_epochs)
+        #all_valid_cls_loss_per_epoch.extend(valid_cls_loss_per_epochs)
         all_train_dfl_loss_per_epoch.extend(train_dfl_loss_per_epoch)
+        
 
         #all_valid_box_loss_per_epoch.extend(val_box_loss)
         #all_valid_cls_loss_per_epochs.extend(val_cls)
@@ -343,6 +357,7 @@ def main(args):
         np_tp = np.array(tp, dtype=bool)
         np_tp = np_tp[:, np.newaxis]
         ap_per_class(category_names,np_tp, np.array(conf), np.array(pred_cls), np.array(target_cls), plot=True , save_dir = OUT_DIR)
+        
 
         # Save box loss for each training epoch
         save_box_loss(all_train_box_loss_per_epoch, OUT_DIR, title='Box_loss_train', label='Train Loss')
@@ -359,8 +374,7 @@ def main(args):
         save_map50_95(val_mAP50_95, OUT_DIR, title='Metrics-mAP50-95(B)')
         save_precisionB(val_precision_per_epoch, OUT_DIR, title='Metrics-precision(B)')
         save_recallB(val_recall_per_epoch , OUT_DIR, title = 'Metrics-recall(B)')
-     
-        # Save loss plot for epoch-wise list.
+  
         save_loss_plot(
             OUT_DIR, 
             train_loss_list_epoch,

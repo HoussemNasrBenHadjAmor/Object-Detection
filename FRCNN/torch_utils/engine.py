@@ -54,7 +54,7 @@ def train_one_epoch(
         images = list(image.to(device) for image in images)
         # Ensure targets is a list of dictionaries with tensor values
         targets = [{k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in t.items()} for t in targets]
-        with torch.amp.autocast(enabled=scaler is not None, device_type=device.type):
+        with torch.cuda.amp.autocast(enabled=scaler is not None):
             loss_dict = model(images, targets)
             losses = sum(loss for loss in loss_dict.values())
 
@@ -84,10 +84,10 @@ def train_one_epoch(
         metric_logger.update(loss=losses_reduced, **loss_dict_reduced)
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
         batch_loss_list.append(loss_value)
-        batch_loss_cls_list.append(loss_dict_reduced['classification'].detach().cpu())
-        batch_loss_box_reg_list.append(loss_dict_reduced['bbox_regression'].detach().cpu())
-        #batch_loss_objectness_list.append(loss_dict_reduced['loss_objectness'].detach().cpu())
-        #batch_loss_rpn_list.append(loss_dict_reduced['loss_rpn_box_reg'].detach().cpu())
+        batch_loss_cls_list.append(loss_dict_reduced['loss_classifier'].detach().cpu())
+        batch_loss_box_reg_list.append(loss_dict_reduced['loss_box_reg'].detach().cpu())
+        batch_loss_objectness_list.append(loss_dict_reduced['loss_objectness'].detach().cpu())
+        batch_loss_rpn_list.append(loss_dict_reduced['loss_rpn_box_reg'].detach().cpu())
         train_loss_hist.send(loss_value)
         
         if scheduler is not None:
@@ -95,7 +95,7 @@ def train_one_epoch(
 
     train_box_loss_per_epoch.append(sum(batch_loss_box_reg_list)/len(batch_loss_box_reg_list))
     train_class_loss_per_epoch.append(sum(batch_loss_cls_list)/len(batch_loss_cls_list))
-    #train_dfl_loss_per_epoch.append(sum(batch_loss_rpn_list)/len(batch_loss_rpn_list))
+    train_dfl_loss_per_epoch.append(sum(batch_loss_rpn_list)/len(batch_loss_rpn_list))
 
     return metric_logger, train_box_loss_per_epoch, train_class_loss_per_epoch, train_dfl_loss_per_epoch, batch_loss_list, batch_loss_cls_list, batch_loss_box_reg_list, batch_loss_objectness_list, batch_loss_rpn_list
 

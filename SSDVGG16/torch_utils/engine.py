@@ -54,7 +54,7 @@ def train_one_epoch(
         images = list(image.to(device) for image in images)
         # Ensure targets is a list of dictionaries with tensor values
         targets = [{k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in t.items()} for t in targets]
-        with torch.amp.autocast(enabled=scaler is not None, device_type=device):
+        with torch.amp.autocast(enabled=scaler is not None, device_type=device.type):
             loss_dict = model(images, targets)
             losses = sum(loss for loss in loss_dict.values())
 

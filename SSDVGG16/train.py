@@ -206,32 +206,22 @@ def main(args):
         build_model = create_model[args['model']]
         model = build_model(num_classes=NUM_CLASSES, size=SIZE)
 
-    # Load pretrained weights if path is provided.
+        # Load pretrained weights if path is provided.
     if args['weights'] is not None:
         print('Loading pretrained weights...')
-        
         # Load the pretrained checkpoint.
-        checkpoint = torch.load(args['weights'], map_location=DEVICE) 
-        keys = list(checkpoint['model_state_dict'].keys())
+        checkpoint = torch.load(args['weights'], map_location=DEVICE)
+        #print(f'checkpoint : {checkpoint}')
         ckpt_state_dict = checkpoint['model_state_dict']
-        # Get the number of classes from the loaded checkpoint.
-        old_classes = ckpt_state_dict['roi_heads.box_predictor.cls_score.weight'].shape[0]
+        #print(f'ckpt_state_dict : {ckpt_state_dict}')
+        # Get the classes and classes number from the checkpoint
+        NUM_CLASSES = checkpoint['config']['NC']
 
         # Build the new model with number of classes same as checkpoint.
         build_model = create_model[args['model']]
-        model = build_model(num_classes=old_classes)
+        model = build_model(num_classes=NUM_CLASSES, size=SIZE)
         # Load weights.
         model.load_state_dict(ckpt_state_dict)
-
-        # Change output features for class predictor and box predictor
-        # according to current dataset classes.
-        in_features = model.roi_heads.box_predictor.cls_score.in_features
-        model.roi_heads.box_predictor.cls_score = torch.nn.Linear(
-            in_features=in_features, out_features=NUM_CLASSES, bias=True
-        )
-        model.roi_heads.box_predictor.bbox_pred = torch.nn.Linear(
-            in_features=in_features, out_features=NUM_CLASSES*4, bias=True
-        )
 
         if args['resume_training']:
             print('RESUMING TRAINING...')
