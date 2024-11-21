@@ -12,7 +12,7 @@ def move_and_click_mouse():
         pyautogui.click()
         
         # Wait for 59 seconds to complete the 1-minute interval
-        time.sleep(59)
+        time.sleep(10)
 
 if __name__ == "__main__":  # Corrected line
     move_and_click_mouse()
