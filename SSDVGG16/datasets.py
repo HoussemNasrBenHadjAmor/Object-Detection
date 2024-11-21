@@ -39,10 +39,15 @@ class CustomDataset(Dataset):
         self.all_annot_paths = glob.glob(os.path.join(self.labels_path, '*.xml'))
         self.all_images = [image_path.split(os.path.sep)[-1] for image_path in self.all_image_paths]
         self.all_images = sorted(self.all_images)
+        print(f'Images number before processing the cleaning : {len(self.all_images)}')
         # Remove all annotations and images when no object is present.
         self.read_and_clean()
+        print(f'Images number after processing the cleaning : {len(self.all_images)}')
+
         
     def read_and_clean(self):
+        valid_annot_paths = []
+        valid_image_paths = []
         # Discard any images and labels when the XML 
         # file does not contain any object.
         for annot_path in self.all_annot_paths:
@@ -52,33 +57,27 @@ class CustomDataset(Dataset):
             for member in root.findall('object'):
                 if member.find('bndbox'):
                     object_present = True
-            if object_present == False:
+                    break
+                    
+            if object_present == True:
                 image_name = annot_path.split(os.path.sep)[-1].split('.xml')[0]
                 image_root = self.all_image_paths[0].split(os.path.sep)[:-1]
-                # remove_image = f"{'/'.join(image_root)}/{image_name}.jpg"
-                remove_image = os.path.join(os.sep.join(image_root), image_name+'.jpg')
-                print(f"Removing {annot_path} and corresponding {remove_image}")
-                self.all_annot_paths.remove(annot_path)
-                self.all_image_paths.remove(remove_image)
+                valid_image_path = os.path.join(os.sep.join(image_root), image_name+'.jpg')
+                # Add the annotation path to valid_annot_paths
+                valid_annot_paths.append(annot_path)
+                #Add the image path to valid_image_paths
+                valid_image_paths.append(valid_image_path)
+                
+        self.all_annot_paths = valid_annot_paths
+        self.all_image_paths = valid_image_paths          
 
         # Discard any image file when no annotation file 
         # is not found for the image. 
         for image_name in self.all_images:
             possible_xml_name = os.path.join(self.labels_path, image_name.split('.jpg')[0]+'.xml')
             if possible_xml_name not in self.all_annot_paths:
-                print(f"{possible_xml_name} not found...")
-                print(f"Removing {image_name} image")
-                # items = [item for item in items if item != element]
                 self.all_images = [image_instance for image_instance in self.all_images if image_instance != image_name]
-                # self.all_images.remove(image_name)
-
-        # for image_path in self.all_image_paths:
-        #     image_name = image_path.split(os.path.sep)[-1].split('.jpg')[0]
-        #     possible_xml_name = f"{self.labels_path}/{image_name.split('.jpg')[0]}.xml"
-        #     if possible_xml_name not in self.all_annot_paths:
-        #         print(f"{possible_xml_name} not found...")
-        #         print(f"Removing {image_name} image")
-        #         self.all_image_paths.remove(image_path)
+                
 
 
     def validate_bbox(self, bbox, image_path):
@@ -89,6 +88,7 @@ class CustomDataset(Dataset):
 
     def load_image_and_labels(self, index):
         image_name = self.all_images[index]
+        #print(f'image_name : {image_name}')
         image_path = os.path.join(self.images_path, image_name)
 
         # Read the image.
@@ -147,15 +147,20 @@ class CustomDataset(Dataset):
         
         # Bounding box to tensor.
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
+        
+        # Handle just one box in an image
+        if boxes.dim() == 0:
+            print('boxe dim 0')
+            print(f'annot_file_path : {annot_file_path}')
+            # Convert to 2D by adding a batch dimension
+            boxes = boxes.unsqueeze(0)
+        
+        elif boxes.dim() == 1:
+            print('boxe dim 1')
+            print(f'annot_file_path : {annot_file_path}')
+        
         # Area of the bounding boxes.
-        
-        # Check if boxes are empty, skip processing if true.
-        if len(boxes) == 0:
-            return None, None, None, None, None, None, None, None, None, None
-        
         area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
-        
-        #area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
         # No crowd instances.
         iscrowd = torch.zeros((boxes.shape[0],), dtype=torch.int64)
         # Labels to tensor.
@@ -244,19 +249,18 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         # Capture the image name and the full image path.
         if not self.mosaic:
-            result = self.load_image_and_labels(index=idx)
-            
-            if result[0] is None:
-            # If boxes are empty, skip this sample
-                return None  # or use some default values if needed
-            
-            image, image_resized, orig_boxes, boxes, labels, area, iscrowd, dims, image_path, annot_file_path = result
+            image, image_resized, orig_boxes, boxes, \
+                labels, area, iscrowd, dims, image_path, annot_file_path = self.load_image_and_labels(
+                index=idx
+            )
 
         if self.train and self.mosaic:
             while True:
-                result = self.load_cutmix_image_and_boxes(idx, resize_factor=(self.height, self.width))
-                if result[2].size(0) > 0:  # Check if boxes tensor is non-empty
-                    image, image_resized, boxes, labels, area, iscrowd, dims, image_path, annot_file_path = result
+                image, image_resized, boxes, labels, \
+                    area, iscrowd, dims, image_path, annot_file_path = self.load_cutmix_image_and_boxes(
+                    idx, resize_factor=(self.height, self.width)
+                )
+                if len(boxes) > 0:
                     break
         
         # visualize_mosaic_images(boxes, labels, image_resized, self.classes)
@@ -271,17 +275,18 @@ class CustomDataset(Dataset):
         target["image_id"] = image_id
         target['image_path'] = image_path
         target['annot_path'] = annot_file_path
+
         if self.use_train_aug: # Use train augmentation if argument is passed.
             train_aug = get_train_aug()
             sample = train_aug(image=image_resized,
                                      bboxes=target['boxes'],
-                                     labels=labels)
+                                     labels=labels.tolist())
             image_resized = sample['image']
             target['boxes'] = torch.Tensor(sample['bboxes'])
         else:
             sample = self.transforms(image=image_resized,
                                      bboxes=target['boxes'],
-                                     labels=labels)
+                                     labels=labels.tolist())
             image_resized = sample['image']
             target['boxes'] = torch.Tensor(sample['bboxes'])    
         
@@ -305,7 +310,6 @@ def collate_fn(batch):
     To handle the data loading as different images may have different number 
     of objects and to handle varying size tensors as well.
     """
-    batch = [item for item in batch if item is not None]
     return tuple(zip(*batch))
 
 # Prepare the final datasets and data loaders.
@@ -313,14 +317,15 @@ def create_train_dataset(
     train_dir_images, train_dir_labels, 
     resize_width, resize_height, classes,
     use_train_aug=False,
-    mosaic=True
+    mosaic=False
 ):
     train_dataset = CustomDataset(
         train_dir_images, train_dir_labels,
         resize_width, resize_height, classes, 
         get_train_transform(),
         use_train_aug=use_train_aug,
-        train=True, mosaic=mosaic
+        train=False,
+        mosaic=mosaic
     )
     return train_dataset
     

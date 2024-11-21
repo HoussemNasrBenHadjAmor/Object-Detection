@@ -1,0 +1,14 @@
+# Images and labels direcotry should be relative to train.py
+TRAIN_DIR_IMAGES: "C:/Object Detection/FRCNN/peoples_cars_drone_no_attack_frcnn_ssd/train"
+TRAIN_DIR_LABELS: "C:/Object Detection/FRCNN/peoples_cars_drone_no_attack_frcnn_ssd/train"
+VALID_DIR_IMAGES: "C:/Object Detection/FRCNN/peoples_cars_drone_no_attack_frcnn_ssd/valid"
+VALID_DIR_LABELS: "C:/Object Detection/FRCNN/peoples_cars_drone_no_attack_frcnn_ssd/valid"
+
+# Class names.
+CLASSES: ['__background__', 'car', 'people']
+
+# Number of classes (object classes + 1 for background class in Faster RCNN).
+NC: 3
+
+# Whether to save the predictions of the validation set while training.
+SAVE_VALID_PREDICTION_IMAGES: True

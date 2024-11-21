@@ -298,22 +298,6 @@ def main(args):
             scheduler=scheduler
         )
 
-        _,  valid_box_loss_per_epoch, \
-             valid_cls_loss_per_epochs, \
-             valid_dfl_loss_per_epoch, \
-             valid_batch_loss_list, \
-             valid_batch_loss_cls_list, \
-             valid_batch_loss_box_reg_list, \
-             valid_batch_loss_objectness_list, \
-             valid_batch_loss_rpn_list = evalute_one_epoch(
-            model, 
-            train_loader, 
-            DEVICE, 
-            epoch, 
-            valid_loss_hist,
-            print_freq=100,
-        )
-
         coco_evaluator, stats, val_pred_image, category_ids, category_names, tp, conf, pred_cls, target_cls, fn_count = evaluate(
             model, 
             valid_loader, 
@@ -332,15 +316,15 @@ def main(args):
         val_recall_per_epoch.append(recall)
 
         train_loss_list.extend(batch_loss_list)
-        valid_loss_list.extend(valid_batch_loss_list)
+        #valid_loss_list.extend(valid_batch_loss_list)
         loss_cls_list.extend(batch_loss_cls_list)
-        valid_loss_cls_list.extend(valid_batch_loss_cls_list)
+        #valid_loss_cls_list.extend(valid_batch_loss_cls_list)
         loss_box_reg_list.extend(batch_loss_box_reg_list)
-        valid_loss_box_reg_list.extend(valid_batch_loss_box_reg_list)
+        #valid_loss_box_reg_list.extend(valid_batch_loss_box_reg_list)
         loss_objectness_list.extend(batch_loss_objectness_list)
-        valid_loss_objectness_list.extend(valid_batch_loss_objectness_list)
+        #valid_loss_objectness_list.extend(valid_batch_loss_objectness_list)
         loss_rpn_list.extend(batch_loss_rpn_list)
-        valid_loss_rpn_list.extend(valid_batch_loss_rpn_list)
+        #valid_loss_rpn_list.extend(valid_batch_loss_rpn_list)
 
         # Append curent epoch's average loss to `train_loss_list_epoch`.
         val_map_05.append(stats[1])
@@ -364,11 +348,11 @@ def main(args):
         # Save box loss for each training epoch
         save_box_loss(all_train_box_loss_per_epoch, OUT_DIR, title='Box_loss_train', label='Train Loss')
         # Save box loss for each validating epoch
-        save_box_loss(all_valid_box_loss_per_epoch, OUT_DIR, title='Box_loss_valid', label='valid Loss')
+        #save_box_loss(all_valid_box_loss_per_epoch, OUT_DIR, title='Box_loss_valid', label='valid Loss')
         # Save class loss for each training epoch 
         save_cls_loss(all_train_cls_loss_per_epochs, OUT_DIR, title='Cls_loss_train', label='Train Loss')
         # Save class loss for each validating epoch 
-        save_cls_loss(all_valid_cls_loss_per_epoch, OUT_DIR, title='Cls_loss_valid', label='Valid Loss')
+        #save_cls_loss(all_valid_cls_loss_per_epoch, OUT_DIR, title='Cls_loss_valid', label='Valid Loss')
 
         # Save mAP50  for each epoch
         save_map50(val_mAP50, OUT_DIR, title='Metrics-mAP50(B)')

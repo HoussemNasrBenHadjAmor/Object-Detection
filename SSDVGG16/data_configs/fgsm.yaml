@@ -1,0 +1,29 @@
+# Base directory for images
+BASE_DIR: "C:/Object Detection/FRCNN/peoples_cars_drone_no_attack_frcnn_ssd"
+
+# Ouput directory for augmentation images
+OUTPUT_DIR: "C:/Object Detection/FRCNN/peoples_cars_drone_no_attack_frcnn_ssd"
+
+# Ouput directory to save some adversarial images examples
+SAVE_DIR_EXAMPLES_PATH: "C:/Object Detection/FRCNN/peoples_cars_drone_no_attack_frcnn_ssd/fgsm_examples"
+
+# Class names.
+CLASSES: ["__background__", "car", "people"]
+
+# Epsilons value to generate the adversarial image
+
+EPSILONS: [.05]
+
+CLASS_MAPPING: { 1: "car", 2: "people" }
+
+# Width for image while loading the dataset
+WIDTH: 1920
+
+# Height for image while loading the dataset
+HEIGHT: 1080
+
+MODEL_PATH: "C:/Object Detection/outputs/training/SSDVGG16/best_model.pth"
+
+MODEL_NAME: ssd300
+
+SIZE: 512

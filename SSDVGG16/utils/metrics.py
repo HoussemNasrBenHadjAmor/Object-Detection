@@ -153,9 +153,9 @@ class ConfusionMatrix:
             labels (Array[M, 5]), class, x1, y1, x2, y2
         Returns:
             None, updates confusion matrix accordingly
-        """
-        if detections is None:
-            gt_classes = labels.int()
+        """        
+        if detections is None or detections.numel() == 0:
+            gt_classes = labels[:, 0].int()
             for gc in gt_classes:
                 self.matrix[self.nc, gc] += 1  # background FN
             return

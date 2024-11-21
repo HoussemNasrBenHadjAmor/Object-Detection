@@ -27,7 +27,7 @@ def train_one_epoch(
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1, fmt="{value:.6f}"))
-    header = f"Epoch: [{epoch}]"
+    header = f"Epoch: [{epoch}] in training"
 
     # List to store batch losses.
     batch_loss_list = []
@@ -38,9 +38,6 @@ def train_one_epoch(
     train_box_loss_per_epoch = []
     train_class_loss_per_epoch = []
     train_dfl_loss_per_epoch = [] 
-    
-    #valid_targets = []
-    #valid_images = []
 
     lr_scheduler = None
     if epoch == 0:
@@ -57,24 +54,8 @@ def train_one_epoch(
         images = list(image.to(device) for image in images)
         # Ensure targets is a list of dictionaries with tensor values
         targets = [{k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in t.items()} for t in targets]
-        
-        # Filter out images with no valid boxes
-        filtered_images = []
-        filtered_targets = []
-        for image, target in zip(images, targets):
-            if target['boxes'].numel() > 0:
-                filtered_images.append(image)
-                filtered_targets.append(target)
-        
-        # If no valid images remain, skip this batch
-        if len(filtered_images) == 0:
-            print("Skipping batch with no valid targets.")
-            continue
-
-            
-        with torch.cuda.amp.autocast(enabled=scaler is not None):
-            #loss_dict = model(images, targets)
-            loss_dict = model(filtered_images, filtered_targets)
+        with torch.amp.autocast(enabled=scaler is not None, device_type=device):
+            loss_dict = model(images, targets)
             losses = sum(loss for loss in loss_dict.values())
 
         # reduce losses over all GPUs for logging purposes
@@ -103,11 +84,10 @@ def train_one_epoch(
         metric_logger.update(loss=losses_reduced, **loss_dict_reduced)
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
         batch_loss_list.append(loss_value)
-
-        # Classification loss 
         batch_loss_cls_list.append(loss_dict_reduced['classification'].detach().cpu())
-        # bbox_regression loss
         batch_loss_box_reg_list.append(loss_dict_reduced['bbox_regression'].detach().cpu())
+        #batch_loss_objectness_list.append(loss_dict_reduced['loss_objectness'].detach().cpu())
+        #batch_loss_rpn_list.append(loss_dict_reduced['loss_rpn_box_reg'].detach().cpu())
         train_loss_hist.send(loss_value)
         
         if scheduler is not None:
@@ -115,9 +95,10 @@ def train_one_epoch(
 
     train_box_loss_per_epoch.append(sum(batch_loss_box_reg_list)/len(batch_loss_box_reg_list))
     train_class_loss_per_epoch.append(sum(batch_loss_cls_list)/len(batch_loss_cls_list))
-    train_dfl_loss_per_epoch.append(sum(batch_loss_box_reg_list)/len(batch_loss_box_reg_list))
+    #train_dfl_loss_per_epoch.append(sum(batch_loss_rpn_list)/len(batch_loss_rpn_list))
 
     return metric_logger, train_box_loss_per_epoch, train_class_loss_per_epoch, train_dfl_loss_per_epoch, batch_loss_list, batch_loss_cls_list, batch_loss_box_reg_list, batch_loss_objectness_list, batch_loss_rpn_list
+
 
 def evalute_one_epoch(
     model,
@@ -166,8 +147,10 @@ def evalute_one_epoch(
 
         metric_logger.update(loss=losses_reduced, **loss_dict_reduced)
         batch_loss_list.append(loss_value)
-        batch_loss_cls_list.append(loss_dict_reduced['classification'].detach().cpu())
-        batch_loss_box_reg_list.append(loss_dict_reduced['bbox_regression'].detach().cpu())
+        batch_loss_cls_list.append(loss_dict_reduced['loss_classifier'].detach().cpu())
+        batch_loss_box_reg_list.append(loss_dict_reduced['loss_box_reg'].detach().cpu())
+        batch_loss_objectness_list.append(loss_dict_reduced['loss_objectness'].detach().cpu())
+        batch_loss_rpn_list.append(loss_dict_reduced['loss_rpn_box_reg'].detach().cpu())
         train_loss_hist.send(loss_value)
 
     valid_box_loss_per_epoch.append(sum(batch_loss_box_reg_list)/len(batch_loss_box_reg_list))
@@ -175,6 +158,7 @@ def evalute_one_epoch(
     valid_dfl_loss_per_epoch.append(sum(batch_loss_rpn_list)/len(batch_loss_rpn_list))
 
     return metric_logger, valid_box_loss_per_epoch, valid_class_loss_per_epoch, valid_dfl_loss_per_epoch, batch_loss_list, batch_loss_cls_list, batch_loss_box_reg_list, batch_loss_objectness_list, batch_loss_rpn_list
+
 
 def _get_iou_types(model):
     model_without_ddp = model
@@ -227,7 +211,7 @@ def evaluate(
     cpu_device = torch.device("cpu")
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
-    header = "Test:"
+    header = "Test with COCO EVALUATOR"
 
     coco = get_coco_api_from_dataset(data_loader.dataset)
     iou_types = _get_iou_types(model)
@@ -242,42 +226,27 @@ def evaluate(
     for images, targets in metric_logger.log_every(data_loader, 100, header):
         counter += 1
         images = list(img.to(device) for img in images)
-        
-         # Filter out images with no valid boxes
-        filtered_images = []
-        filtered_targets = []
-        for image, target in zip(images, targets):
-            if target['boxes'].numel() > 0:
-                filtered_images.append(image)
-                filtered_targets.append(target)
-        
-        # If no valid images remain, skip this batch
-        if len(filtered_images) == 0:
-            print("Skipping batch with no valid targets.")
-            continue
-        
+
         if torch.cuda.is_available():
             torch.cuda.synchronize()
         model_time = time.time()
-        outputs = model(filtered_images)
+        outputs = model(images)
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
         #targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
           # Ensure targets is a list of dictionaries with tensor values
         targets = [{k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in t.items()} for t in targets]
         
+
       
         
         # Extracting boxes, scores, and labels from outputs
-        for output, target in zip(outputs, filtered_targets):
+        for output, target in zip(outputs, targets):
             pred_boxes = output['boxes'].cpu().detach().numpy()
             pred_scores = output['scores'].cpu().detach().numpy()
             pred_labels = output['labels'].cpu().detach().numpy()
 
             gt_boxes = target['boxes'].cpu().detach().numpy()
             gt_labels = target['labels'].cpu().detach().numpy()
-
-            #print(f'prediction boxes length : {len(pred_boxes)}')
-            #print(f'target boxes length : {len(gt_boxes)}')
 
             # Format predictions and targets for confusion matrix
             predn = torch.tensor([
@@ -376,4 +345,4 @@ def evaluate(
     category_ids = data_loader.dataset.get_category_ids()
     category_names = data_loader.dataset.get_category_names()
 
-    return coco_evaluator, stats, None, category_ids, category_names, tp, conf, pred_cls, target_cls, fn_count 
+    return coco_evaluator, stats, val_saved_image, category_ids, category_names, tp, conf, pred_cls, target_cls, fn_count 

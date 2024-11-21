@@ -25,7 +25,6 @@ def parse_opt():
         '-c', '--config', default=None,
         help='path to the data config file'
     )
-    
     parser.add_argument(
         '-m', '--model', default=None,
         help='path to the model'
@@ -56,8 +55,8 @@ def main (args):
     WIDTH = data_configs['WIDTH']    
     HEIGHT = data_configs['HEIGHT']
     SAVE_DIR_EXAMPLES_PATH = data_configs['SAVE_DIR_EXAMPLES_PATH']
-    SIZE = data_configs['SIZE']
     MODEL_NAME = data_configs['MODEL_NAME']
+    SIZE = data_configs['SIZE']
     
     use_cuda=True
     device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
@@ -65,7 +64,9 @@ def main (args):
     print('Loading pretrained weights...')
     # Load the pretrained checkpoint.
     checkpoint = torch.load(MODEL_PATH, map_location=device)
+    #print(f'checkpoint : {checkpoint}')
     ckpt_state_dict = checkpoint['model_state_dict']
+    #print(f'ckpt_state_dict : {ckpt_state_dict}')
     # Get the classes and classes number from the checkpoint
     NUM_CLASSES = checkpoint['config']['NC']
 
@@ -104,9 +105,8 @@ def main (args):
         perturbed_image = torch.clamp(perturbed_image, 0, 1)
         return perturbed_image
 
-    def check_pred_target(output , target ,skip, threshold):
-        mask = output[0]['scores'] > threshold
-        output_shape = output['labels'][mask].shape[0]
+    def check_pred_target(output , target ,skip):
+        output_shape = output[0]['labels'].shape[0]
         target_shape = target['labels'].shape[0]
         if output_shape != target_shape:
             if skip:
@@ -134,8 +134,8 @@ def main (args):
     
         # Generate a random image_name using UUID    
         random_filename = str(uuid.uuid4())
-        image_name = random_filename + '.jpg'
-        label_name = random_filename + '.xml'
+        image_name = random_filename + '_fgsm.jpg'
+        label_name = random_filename + '_fgsm.xml'
         fsgm_image_path = os.path.join(image_dir, image_name)    
         fsgm_label_path = os.path.join(image_dir, label_name)    
 
@@ -181,67 +181,76 @@ def main (args):
 
         etree.ElementTree(anno_tree).write(fsgm_label_path, pretty_print=True)        
     
-    def create_adversarial_attack (epsilon, base_dir, output_dir, width, height, classes, class_mapping, device, threshold) :
-    # Process the entire validation dataset
-        adv_examples = []
-        correct = 0
-        i = 0
+    def create_adversarial_attack(epsilon, base_dir, output_dir, width, height, classes, class_mapping, device, number_max_fgsm=5000):
+        """
+        Generates a fixed number of adversarial attacks from random images in the dataset.
+
+        Args:
+            epsilon (float): Perturbation magnitude.
+            base_dir (str): Base directory of the dataset.
+            output_dir (str): Directory to save adversarial images.
+            width (int): Image width.
+            height (int): Image height.
+            classes (list): List of class names.
+            class_mapping (dict): Mapping of class indices to names.
+            device (torch.device): PyTorch device.
+            number_max_fgsm (int): Maximum number of adversarial attacks to generate.
+        """
+        i = 0  # Counter for generated adversarial examples
+
         for folder in ['train', 'valid', 'test']:
+            correct = 0
             image_dir = os.path.join(base_dir, folder)
             label_dir = os.path.join(base_dir, folder)
             dataset = create_valid_dataset(image_dir, label_dir, width, height, classes)
-    
-            for image , target in tqdm(dataset, desc=f'Processing adversarial attack in {folder} images'):
-                image = image.to(device)
-                image = image.unsqueeze(0)
-            
-                # Set requires_grad attribute of tensor. Important for Attack
+
+            # Randomly select a subset of the dataset
+            dataset_indices = list(range(len(dataset)))
+            random_indices = random.sample(dataset_indices, min(number_max_fgsm, len(dataset)))
+
+            # Process only the randomly selected indices
+            for idx in tqdm(random_indices, desc=f'Processing adversarial attack in {folder} images'):
+                image, target = dataset[idx]
+                image = image.to(device).unsqueeze(0)  # Add batch dimension
                 image.requires_grad = True
+                
                 # Forward pass the data through the model
                 outputs = model(image)
 
-                # Check if pred and target are the same to compute the loss or just skip
-                result = check_pred_target(outputs , target, True, threshold)
-                if result == None:
+                # Check if pred and target are the same to compute the loss or skip
+                result = check_pred_target(outputs, target, True)
+                if result is None:
                     continue
 
                 # Calculate loss
-                loss = loss_fn(outputs, target, device)  # Assuming loss function and model expect labels
-
+                loss = loss_fn(outputs, target, device)
                 model.zero_grad()
                 loss.backward()
 
+                # Generate adversarial example
                 data_grad = image.grad.data
                 adv_image = fgsm_attack(image, epsilon, data_grad)
                 adv_outputs = model(adv_image)
 
                 # Check if adv_pred and target are the same
-                result = check_pred_target(adv_outputs , target, False, threshold)
+                result = check_pred_target(adv_outputs, target, False)
 
-                if result != None:
-                    # Means the adv_pred and target are not the same
-                    adv_examples.append(adv_image)
-                    save_fgsm_image_label(output_dir, adv_image, target, folder, class_mapping)
-                else :
-                    # Means the adv_pred and labels are the same
-                    correct +=1
+                # If adv_pred and target differ, save the adversarial example
+                if result is not None:
+                    if i < number_max_fgsm:
+                        save_fgsm_image_label(output_dir, adv_image, target, folder, class_mapping)
+                        i += 1
+                else:
+                    correct += 1
 
-            # Calculate final accuracy for this epsilon
-            final_acc = correct/float(len(dataset))
-            # Increment i to save the images and targets depending on which folder --> exp train/test/valid
-            i += 1
-    
-            print(f"Epsilon: {epsilon}\tTest Accuracy = {correct} / {len(dataset)} = {final_acc}")
+            # Calculate and log accuracy for this folder
+            final_acc = correct / float(len(random_indices))
+            print(f"Epsilon: {epsilon}\tTest Accuracy = {correct} / {len(random_indices)} = {final_acc}")
 
             # Clear GPU memory after processing each folder
             del dataset
-            del image
-            del target
             torch.cuda.empty_cache()
 
-
-        # Return the accuracy and an adversarial example
-        return final_acc, adv_examples
 
     def save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH):
         os.makedirs(SAVE_DIR_EXAMPLES_PATH, exist_ok=True)  
@@ -256,16 +265,10 @@ def main (args):
             # Save the image into path
             cv2.imwrite(os.path.join(SAVE_DIR_EXAMPLES_PATH, f'random_example_{i}.jpg'), image)
 
-    adv_examples = []
     # Run test for each epsilon
     for eps in EPSILONS:
-        _, ex = create_adversarial_attack(eps, BASE_DIR, OUTPUT_DIR, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, device, 0.5)
-        adv_examples.extend(ex)
+        create_adversarial_attack(eps, BASE_DIR, OUTPUT_DIR, WIDTH, HEIGHT, CLASSES, CLASS_MAPPING, device)
 
-    # Select 10 random examples
-    random_examples = random.sample(adv_examples, 10 if len(adv_examples) > 10 else len(adv_examples))
-
-    save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH)
 
     print('Generation adversarial attack has completed successfully')
 

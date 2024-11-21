@@ -470,44 +470,31 @@ def denormalize(x, mean=None, std=None):
     # Returns tensor of shape [B, 3, H, W].
     return torch.clamp(x, 0, 1)
 
-
 def save_validation_results(images, detections, counter, out_dir, classes, colors):
     """
     Function to save validation results.
     :param images: All the images from the current batch.
     :param detections: All the detection results.
     :param counter: Step counter for saving with unique ID.
-    :param out_dir: Directory to save output images.
-    :param classes: List of class names.
-    :param colors: List of colors for each class.
     """
     IMG_MEAN = [0.485, 0.456, 0.406]
     IMG_STD = [0.229, 0.224, 0.225]
-    image_list = []  # List to store predicted images to return.
-    
+    image_list = [] # List to store predicted images to return.
     for i, detection in enumerate(detections):
         image_c = images[i].clone()
         # image_c = denormalize(image_c, IMG_MEAN, IMG_STD)
         image_c = image_c.detach().cpu().numpy().astype(np.float32)
         image = np.transpose(image_c, (1, 2, 0))
+
         image = np.ascontiguousarray(image, dtype=np.float32)
 
         scores = detection['scores'].cpu().numpy()
         labels = detection['labels']
         bboxes = detection['boxes'].detach().cpu().numpy()
         boxes = bboxes[scores >= 0.5].astype(np.int32)
-
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-        
-        # Check and handle out-of-range indices
-        labels_np = labels.cpu().numpy()
-        num_classes = len(classes)
-        if any(i >= num_classes for i in labels_np):
-            print(f"Warning: Some label indices are out of range: {set(i for i in labels_np if i >= num_classes)}")
-            labels_np = np.clip(labels_np, 0, num_classes - 1)
-        
-        pred_classes = [classes[i] for i in labels_np]
-        
+        # Get all the predicited class names.
+        pred_classes = [classes[i] for i in labels.cpu().numpy()]
         for j, box in enumerate(boxes):
             class_name = pred_classes[j]
             color = colors[classes.index(class_name)]
@@ -521,12 +508,9 @@ def save_validation_results(images, detections, counter, out_dir, classes, color
                     (int(box[0]), int(box[1]-5)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 
                     2, lineType=cv2.LINE_AA)
-        
-        cv2.imwrite(f"{out_dir}/image_{i}_{counter}.jpg", image * 255.)
+        cv2.imwrite(f"{out_dir}/image_{i}_{counter}.jpg", image*255.)
         image_list.append(image[:, :, ::-1])
-    
     return image_list
-
 
 def set_infer_dir():
     """
