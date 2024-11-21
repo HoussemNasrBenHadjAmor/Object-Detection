@@ -75,6 +75,10 @@ def parse_opt():
         help='image size to feed to the network'
     )
     parser.add_argument(
+        '-size', '--size', dest='size', default=512, type=int, 
+        help='model size : either 512 or 300 supported'
+    )
+    parser.add_argument(
         '-pn', '--project-name', default=None, type=str, dest='project_name',
         help='training result dir name in outputs/training/, (default res_#)'
     )
@@ -120,6 +124,7 @@ def main(args):
     TRAIN_DIR_LABELS = data_configs['TRAIN_DIR_LABELS']
     VALID_DIR_IMAGES = data_configs['VALID_DIR_IMAGES']
     VALID_DIR_LABELS = data_configs['VALID_DIR_LABELS']
+    SIZE = args['size']
     CLASSES = data_configs['CLASSES']
     NUM_CLASSES = data_configs['NC']
     NUM_WORKERS = args['workers']
@@ -130,6 +135,10 @@ def main(args):
     VISUALIZE_TRANSFORMED_IMAGES = args['vis_transformed']
     OUT_DIR = set_training_dir(args['project_name'])
     COLORS = np.random.uniform(0, 1, size=(len(CLASSES), 3))
+
+    # Check the condition
+    if args["size"] not in [300, 512]:
+        raise ValueError(f"Invalid size: {args['size']}. Allowed sizes are 300 or 512.")
     # Set logging file.
     set_log(OUT_DIR)
     # writer = set_summary_writer(OUT_DIR)
@@ -195,7 +204,7 @@ def main(args):
     if args['weights'] is None:
         print('Building model from scratch...')
         build_model = create_model[args['model']]
-        model = build_model(num_classes=NUM_CLASSES, size=IMAGE_WIDTH)
+        model = build_model(num_classes=NUM_CLASSES, size=SIZE)
 
     # Load pretrained weights if path is provided.
     if args['weights'] is not None:

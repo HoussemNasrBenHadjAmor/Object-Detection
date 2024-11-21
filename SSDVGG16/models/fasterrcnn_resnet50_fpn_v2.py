@@ -25,7 +25,7 @@ def create_model(num_classes=91, size=300):
     return model
 
 if __name__ == '__main__':
-    model = create_model(num_classes=91, size=300)
+    model = create_model(num_classes=91, size=512)
     print(model)
     # Total parameters and trainable parameters.
     total_params = sum(p.numel() for p in model.parameters())
