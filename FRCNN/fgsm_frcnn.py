@@ -176,7 +176,7 @@ def main (args):
 
         etree.ElementTree(anno_tree).write(fsgm_label_path, pretty_print=True)        
     
-    def create_adversarial_attack(epsilon, base_dir, output_dir, width, height, classes, class_mapping, device, number_max_fgsm=100):
+    def create_adversarial_attack(epsilon, base_dir, output_dir, width, height, classes, class_mapping, device, number_max_fgsm=500):
         """
         Generates a fixed number of adversarial attacks from random images in the dataset.
 
@@ -201,7 +201,7 @@ def main (args):
 
             # Randomly select a subset of the dataset
             dataset_indices = list(range(len(dataset)))
-            random_indices = random.sample(dataset_indices, min(number_max_fgsm, len(dataset)))
+            random_indices = random.sample(dataset_indices, min(len(dataset), len(dataset)))
 
             # Process only the randomly selected indices
             for idx in tqdm(random_indices, desc=f'Processing adversarial attack in {folder} images'):
@@ -232,7 +232,7 @@ def main (args):
 
                 # If adv_pred and target differ, save the adversarial example
                 if result is not None:
-                    if i < number_max_fgsm:
+                    if i <= 400:
                         save_fgsm_image_label(output_dir, adv_image, target, folder, class_mapping)
                         i += 1
                 else:
