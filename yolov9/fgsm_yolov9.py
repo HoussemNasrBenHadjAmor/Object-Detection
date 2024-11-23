@@ -178,16 +178,35 @@ def main(args):
                 f.write(formatted_row + '\n')
 
 
-    def create_adversarial_attack(epsilon, base_dir, imgsz, batch_size, output_dir):
-        # Process the entire validation dataset
-        adv_examples = []
+    def create_adversarial_attack(epsilon, base_dir, imgsz, batch_size, output_dir, max_fgsm_generated):
+        """
+        Generates a fixed number of adversarial attacks from random images in the dataset.
 
+        Args:
+            epsilon (float): Perturbation magnitude.
+            base_dir (str): Base directory of the dataset.
+            output_dir (str): Directory to save adversarial images.
+            width (int): Image width.
+            height (int): Image height.
+            classes (list): List of class names.
+            class_mapping (dict): Mapping of class indices to names.
+            device (torch.device): PyTorch device.
+            number_max_fgsm (int): Maximum number of adversarial attacks to generate.
+        """
+
+    
         for folder  in ['train', 'valid', 'test']:
+            i = 0  # Counter for generated adversarial examples
             correct = 0
             image_dir = os.path.join(base_dir, folder)
             _, dataset = create_dataloader(image_dir , imgsz, batch_size, 32)
 
             for img, target, _, _ in tqdm(dataset, desc=f'Processing adversarial attack in {folder} images'):
+                # Check if we have reached the max adversarial examples
+                if i >= max_fgsm_generated:
+                    print(f"Reached the limit of {max_fgsm_generated} adversarial examples for {folder}.")
+                    break
+                
                 im = img.float().to(device)
                 im /= 255
                 if len(im.shape) == 3:
@@ -219,19 +238,22 @@ def main(args):
                 result = check_pred_target(adv_outputs, target, False)
 
                 if result is not None:
-                    # Means the adv_pred and target are not the same
-                    #adv_examples.append(adv_image)
-                    save_fgsm_image_label(output_dir, adv_image, target, folder)
+                    if i < max_fgsm_generated:
+                        # Means the adv_pred and target are not the same
+                        #adv_examples.append(adv_image)
+                        save_fgsm_image_label(output_dir, adv_image, target, folder)
+                        i += 1
                 else:
                     # Means the adv_pred and labels are the same
                     correct += 1
 
             # Calculate final accuracy for this epsilon
             final_acc = correct / float(len(dataset))
-            print(f"Epsilon: {epsilon}\tTest Accuracy = {correct} / {len(dataset)} = {final_acc}")
+            print(f"Epsilon: {epsilon}\tTest Accuracy = {correct} / {len(dataset)} = {final_acc}")    
 
-        # Return the accuracy and an adversarial example
-        return final_acc, adv_examples            
+            # Clear GPU memory after processing each folder
+            del dataset
+            torch.cuda.empty_cache()      
 
     def save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH):
         os.makedirs(SAVE_DIR_EXAMPLES_PATH, exist_ok=True)  
@@ -249,7 +271,7 @@ def main(args):
     adv_examples = []
     # Run test for each epsilon
     for eps in EPSILONS:
-        _, ex = create_adversarial_attack(eps, BASE_DIR, IMGSZ, BATCH_SIZE, OUTPUT_DIR)
+        create_adversarial_attack(eps, BASE_DIR, IMGSZ, BATCH_SIZE, OUTPUT_DIR, max_fgsm_generated=400)
         #adv_examples.extend(ex)
 
     # Select 10 random examples

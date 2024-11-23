@@ -196,9 +196,10 @@ def main (args):
             device (torch.device): PyTorch device.
             number_max_fgsm (int): Maximum number of adversarial attacks to generate.
         """
-        i = 0  # Counter for generated adversarial examples
+        
 
         for folder in ['train', 'valid', 'test']:
+            i = 0  # Counter for generated adversarial examples
             correct = 0
             image_dir = os.path.join(base_dir, folder)
             label_dir = os.path.join(base_dir, folder)
@@ -210,6 +211,11 @@ def main (args):
 
             # Process only the randomly selected indices
             for idx in tqdm(random_indices, desc=f'Processing adversarial attack in {folder} images'):
+                # Check if we have reached the max adversarial examples
+                if i >= number_max_fgsm:
+                    print(f"Reached the limit of {number_max_fgsm} adversarial examples for {folder}.")
+                    break
+
                 image, target = dataset[idx]
                 image = image.to(device).unsqueeze(0)  # Add batch dimension
                 image.requires_grad = True

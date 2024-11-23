@@ -303,7 +303,7 @@ def main (args):
         # Link to download the model checkpoint : https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true 
 
         # Initialize the model
-        model_ckp  = '/teamspace/studios/this_studio/Depth-Anything-V2/depth_anything_v2_vitl.pth' 
+        model_ckp  = '/teamspace/studios/this_studio/depth_anything_v2_vitl.pth' 
 
         model_depth = DepthAnythingV2(**model_configs[encoder])
         model_depth.load_state_dict(torch.load(model_ckp, map_location='cpu'))
@@ -378,6 +378,8 @@ def main (args):
     #save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH)
 
     #apply_haze_and_save_after_applying_and_saving_augmentation(BASE_DIR)
+    print('Generation augmetation has completed successfully')
+
     
 
 if __name__ == '__main__':

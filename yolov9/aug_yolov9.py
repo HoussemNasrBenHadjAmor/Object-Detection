@@ -124,7 +124,6 @@ def main (args):
             cv2.imwrite(os.path.join(SAVE_DIR_EXAMPLES_PATH, f'random_example_{i}.jpg'), image)
 
     def process_augmentation(base_dir, output_dir, augmentation_pipeline, classes_to_augment, NUMBER_OF_AUGMETATION_PER_IMAGE, class_names):
-        aug_examples = []
         # Process each directory
         for folder in ['train', 'valid', 'test']:
             image_dir = os.path.join(base_dir, folder, 'images')
@@ -152,14 +151,12 @@ def main (args):
                         if augmented_bboxes and augmented_class_labels:
                             #aug_examples.append(augmented_image)
                             save_augmented_image_and_labels(augmented_image, augmented_bboxes, augmented_class_labels, image_path, label_path, output_image_dir, output_label_dir, i, class_names)
-
-        return aug_examples
     
     def generate_haze (base_dir, num_images=800) :
         # Link to download the model checkpoint : https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true 
 
         # Initialize the model
-        model_ckp  = '/teamspace/studios/this_studio/depth_anything_v2_vitl.pth' 
+        model_ckp  = '/kaggle/input/depth-anything-v2/depth_anything_v2_vitl.pth' 
 
         model_depth = DepthAnythingV2(**model_configs[encoder])
         model_depth.load_state_dict(torch.load(model_ckp, map_location='cpu'))
@@ -221,21 +218,12 @@ def main (args):
                     # Save the .txt file with '_hazed' appended
                     with open(hazed_txt_path, 'w') as hazed_txt_file:
                         hazed_txt_file.write(txt_content)
-    
-    aug_examples = []
-
+ 
     generate_haze(BASE_DIR)
 
-    aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, augmentation_pipeline, CLASSES_TO_AUGMENT, NUMBER_OF_AUGMETATION_PER_IMAGE, CLASS_NAMES)
+    process_augmentation(BASE_DIR, OUTPUT_DIR, augmentation_pipeline, CLASSES_TO_AUGMENT, NUMBER_OF_AUGMETATION_PER_IMAGE, CLASS_NAMES)
 
-    #aug_examples.extend(aug_array)
-
-    # Select 10 random examples
-    #random_examples = random.sample(aug_examples, 10 if len(aug_examples) > 10 else len(aug_examples))
-
-    #save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH)
-
-    #print('Generation augmetation has completed successfully')
+    print('Generation augmetation has completed successfully')
 
 
 if __name__ == '__main__':

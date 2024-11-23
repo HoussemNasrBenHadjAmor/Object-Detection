@@ -1,14 +1,14 @@
 # Base directory for images
-BASE_DIR: "/kaggle/working/football-players-detection-9"
+BASE_DIR: "/kaggle/working/yolov5-peoples&cars-8"
 
-# Ouput directory for augmentation images
-OUTPUT_DIR: "/kaggle/working/football-players-detection-9"
+# Ouput directory for fgsm images
+OUTPUT_DIR: "/kaggle/working/yolov5-peoples&cars-8"
 
 # Ouput directory to save some adversarial images examples
-SAVE_DIR_EXAMPLES_PATH: "/kaggle/working/football-players-detection-9/examples_adversarial"
+SAVE_DIR_EXAMPLES_PATH: "/kaggle/working/yolov5-peoples&cars-8/examples_adversarial"
 
 # Epsilons value to generate the adversarial image
-EPSILONS: [.05, .1, .15]
+EPSILONS: [.05]
 
 # Width for image while loading the dataset
 WIDTH: 1920
@@ -23,7 +23,7 @@ IMGSZ: 640
 BATCH_SIZE: 64
 
 # Model path
-MODEL_PATH: "/kaggle/input/yolov9-100-epochs/best.pt"
+MODEL_PATH: "/kaggle/working/runs/detect/train2/weights/best.pt"
 
-# Data yaml for the model
-DATA_TRAINING_PATH: "/kaggle/working/football-players-detection-9/data.yaml"
+# Data yaml that the model path was trained on
+DATA_TRAINING_PATH: "/kaggle/working/Object-Detection/FRCNN/data_configs/ppe.yaml"

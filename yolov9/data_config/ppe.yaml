@@ -1,0 +1,7 @@
+names:
+  - car
+  - people
+nc: 2
+test: /kaggle/working/yolov5-peoples&cars-8/test/images
+train: /kaggle/working/yolov5-peoples&cars-8/train/images
+val: /kaggle/working/yolov5-peoples&cars-8/valid/images

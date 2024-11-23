@@ -13,7 +13,7 @@ CLASS_NAMES: ["__background__", "car", "people"]
 CLASSES_TO_AUGMENT: ["car", "people"]
 
 # Number of augmetation per image
-NUMBER_OF_AUGMETATION_PER_IMAGE: 3
+NUMBER_OF_AUGMETATION_PER_IMAGE: 5
 
 # Width for image while loading the dataset
 WIDTH: 1920
