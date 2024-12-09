@@ -1,6 +1,14 @@
 "use client";
 
-import { useYolov9, useFrcnn, useYolov8 } from "@/hooks";
+import {
+  useFrcnnNoAttack,
+  useFrcnnWithAttack,
+  useSddNoAttack,
+  useSddWithAttack,
+  useYolov9NoAttack,
+  useYolov9WithAttack,
+  useYolov8,
+} from "@/hooks";
 import { ChangeEvent, FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -26,9 +34,15 @@ export default function Home() {
   const [threshold, setThreshold] = useState<number>(defaultThreshold[0]);
   const [error, setError] = useState<string | null>(null);
 
-  const yolov9 = useYolov9(image, threshold);
-  const frcnn = useFrcnn(image, threshold);
+  const yolov9_with_attack = useYolov9WithAttack(image, threshold);
+  const yolov9_no_attack = useYolov9NoAttack(image, threshold);
   const yolov8 = useYolov8(image, threshold);
+
+  const frcnn_with_attack = useFrcnnWithAttack(image, threshold);
+  const frcnn_no_attack = useFrcnnNoAttack(image, threshold);
+
+  const ssd_with_attack = useSddWithAttack(image, threshold);
+  const ssd_no_attack = useSddNoAttack(image, threshold);
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -46,18 +60,38 @@ export default function Home() {
     setDetectedImageUrl(null); // Reset detected image URL
     setError(null); // Reset error
 
-    if (selectedModel === "Yolov9" && image) {
-      yolov9.mutate(undefined, {
+    if (selectedModel === "yolov9_with_attack" && image) {
+      yolov9_with_attack.mutate(undefined, {
         onSuccess: (data) => setDetectedImageUrl(data), // Handle successful response
         onError: (err) => setError(err.message), // Handle error response
       });
-    } else if (selectedModel === "Yolov8" && image) {
+    } else if (selectedModel === "yolov9_no_attack" && image) {
+      yolov9_no_attack.mutate(undefined, {
+        onSuccess: (data) => setDetectedImageUrl(data),
+        onError: (err) => setError(err.message),
+      });
+    } else if (selectedModel === "yolov8" && image) {
       yolov8.mutate(undefined, {
         onSuccess: (data) => setDetectedImageUrl(data),
         onError: (err) => setError(err.message),
       });
-    } else if (selectedModel === "F-R-CNN" && image) {
-      frcnn.mutate(undefined, {
+    } else if (selectedModel === "frcnn_with_attack" && image) {
+      frcnn_with_attack.mutate(undefined, {
+        onSuccess: (data) => setDetectedImageUrl(data),
+        onError: (err) => setError(err.message),
+      });
+    } else if (selectedModel === "frcnn_no_attack" && image) {
+      frcnn_no_attack.mutate(undefined, {
+        onSuccess: (data) => setDetectedImageUrl(data),
+        onError: (err) => setError(err.message),
+      });
+    } else if (selectedModel === "ssd_with_attack" && image) {
+      ssd_with_attack.mutate(undefined, {
+        onSuccess: (data) => setDetectedImageUrl(data),
+        onError: (err) => setError(err.message),
+      });
+    } else if (selectedModel === "ssd_no_attack" && image) {
+      ssd_no_attack.mutate(undefined, {
         onSuccess: (data) => setDetectedImageUrl(data),
         onError: (err) => setError(err.message),
       });
@@ -70,7 +104,14 @@ export default function Home() {
     setSelectedModel(value);
   };
 
-  const isPending = yolov9.isPending || frcnn.isPending || yolov8.isPending;
+  const isPending =
+    yolov9_with_attack.isPending ||
+    yolov9_no_attack.isPending ||
+    frcnn_with_attack.isPending ||
+    frcnn_no_attack.isPending ||
+    ssd_with_attack.isPending ||
+    ssd_no_attack.isPending ||
+    yolov8.isPending;
 
   return (
     <div className="max-w-5xl mx-auto p-10 justify-center items-center flex flex-col">
@@ -86,11 +127,25 @@ export default function Home() {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="Yolov8">Yolov8</SelectItem>
-                <SelectItem value="Yolov9">Yolov9</SelectItem>
-                <SelectItem value="Yolov10">Yolov10</SelectItem>
-                <SelectItem value="SSD">SSD</SelectItem>
-                <SelectItem value="F-R-CNN">F-R-CNN</SelectItem>
+                <SelectItem value="yolov8">Yolov8</SelectItem>
+                <SelectItem value="yolov9_no_attack">
+                  Yolov9 Without Adversarial Attack
+                </SelectItem>
+                <SelectItem value="yolov9_with_attack">
+                  Yolov9 With Adversarial Attack
+                </SelectItem>
+                <SelectItem value="frcnn_no_attack">
+                  F-R-CNN Without Adversarial Attack
+                </SelectItem>
+                <SelectItem value="frcnn_with_attack">
+                  F-R-CNN With Adversarial Attack
+                </SelectItem>
+                <SelectItem value="ssd_no_attack">
+                  SSD Without Adversarial Attack
+                </SelectItem>
+                <SelectItem value="ssd_with_attack">
+                  SSD With Adversarial Attack
+                </SelectItem>
                 <SelectItem value="all">All</SelectItem>
               </SelectGroup>
             </SelectContent>

@@ -23,7 +23,7 @@ IMGSZ: 640
 BATCH_SIZE: 64
 
 # Model path
-MODEL_PATH: "/kaggle/working/runs/detect/train2/weights/best.pt"
+MODEL_PATH: "/kaggle/working/runs/detect/train/weights/best.pt"
 
 # Data yaml that the model path was trained on
 DATA_TRAINING_PATH: "/kaggle/working/Object-Detection/FRCNN/data_configs/ppe.yaml"

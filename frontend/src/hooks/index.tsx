@@ -1,9 +1,25 @@
 import {
-  getPredictionYolov9,
-  getPredictionFRCNN,
+  getPredictionYolov9NoAttack,
+  getPredictionYolov9WithAttack,
+  getPredictionFRCNNWithAttack,
+  getPredictionFRCNNNoAttack,
+  getPredictionSSDWithAttack,
+  getPredictionSSDNoAttack,
   getPredictionYolov8,
 } from "@/api";
 import { useMutation } from "@tanstack/react-query";
+
+const useYolov9WithAttack = (image: File | null, threshold: number) => {
+  return useMutation({
+    mutationFn: () => getPredictionYolov9WithAttack({ image, threshold }),
+  });
+};
+
+const useYolov9NoAttack = (image: File | null, threshold: number) => {
+  return useMutation({
+    mutationFn: () => getPredictionYolov9NoAttack({ image, threshold }),
+  });
+};
 
 const useYolov8 = (image: File | null, threshold: number) => {
   return useMutation({
@@ -11,22 +27,36 @@ const useYolov8 = (image: File | null, threshold: number) => {
   });
 };
 
-const useYolov9 = (image: File | null, threshold: number) => {
+const useFrcnnWithAttack = (image: File | null, threshold: number) => {
   return useMutation({
-    mutationFn: () => getPredictionYolov9({ image, threshold }),
+    mutationFn: () => getPredictionFRCNNWithAttack({ image, threshold }),
   });
 };
 
-const useYolov10 = () => {
+const useFrcnnNoAttack = (image: File | null, threshold: number) => {
   return useMutation({
-    mutationFn: getPredictionYolov9,
+    mutationFn: () => getPredictionFRCNNNoAttack({ image, threshold }),
   });
 };
 
-const useFrcnn = (image: File | null, threshold: number) => {
+const useSddWithAttack = (image: File | null, threshold: number) => {
   return useMutation({
-    mutationFn: () => getPredictionFRCNN({ image, threshold }),
+    mutationFn: () => getPredictionSSDWithAttack({ image, threshold }),
   });
 };
 
-export { useYolov9, useYolov10, useYolov8, useFrcnn };
+const useSddNoAttack = (image: File | null, threshold: number) => {
+  return useMutation({
+    mutationFn: () => getPredictionSSDNoAttack({ image, threshold }),
+  });
+};
+
+export {
+  useYolov9WithAttack,
+  useYolov9NoAttack,
+  useFrcnnWithAttack,
+  useFrcnnNoAttack,
+  useSddWithAttack,
+  useSddNoAttack,
+  useYolov8,
+};

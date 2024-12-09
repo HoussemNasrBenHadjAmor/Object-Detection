@@ -1,5 +1,6 @@
 import torch
-from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2
+#from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2
+from models.create_fasterrcnn_model import create_model
 #from torchvision.transforms import functional as F
 import torch.nn.functional as F
 from PIL import Image
@@ -54,22 +55,26 @@ def main (args):
     WIDTH = data_configs['WIDTH']    
     HEIGHT = data_configs['HEIGHT']
     SAVE_DIR_EXAMPLES_PATH = data_configs['SAVE_DIR_EXAMPLES_PATH']
+    MODEL_NAME = data_configs['MODEL_NAME']
+    SIZE = data_configs['SIZE']
     
     use_cuda=True
     device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
 
-    # Load the state_dict
+    print('Loading pretrained weights...')
+    # Load the pretrained checkpoint.
     checkpoint = torch.load(MODEL_PATH, map_location=device)
-
+    #print(f'checkpoint : {checkpoint}')
+    ckpt_state_dict = checkpoint['model_state_dict']
+    #print(f'ckpt_state_dict : {ckpt_state_dict}')
     # Get the classes and classes number from the checkpoint
     NUM_CLASSES = checkpoint['config']['NC']
-    #CLASSES = checkpoint['config']['CLASSES']
 
-    # Create our model
-    model = fasterrcnn_resnet50_fpn_v2(num_classes = NUM_CLASSES, pretrained=False, coco_model=False)
-
-    # Load the state_dict into the model
-    model.load_state_dict(checkpoint['model_state_dict'])
+    # Build the new model with number of classes same as checkpoint.
+    build_model = create_model[MODEL_NAME]
+    model = build_model(num_classes=NUM_CLASSES, size=SIZE)
+    # Load weights.
+    model.load_state_dict(ckpt_state_dict)
 
     # Set the model to device and evaluation mode
     model.to(device).eval()
@@ -129,8 +134,8 @@ def main (args):
     
         # Generate a random image_name using UUID    
         random_filename = str(uuid.uuid4())
-        image_name = random_filename + '.jpg'
-        label_name = random_filename + '.xml'
+        image_name = random_filename + '_fgsm.jpg'
+        label_name = random_filename + '_fgsm.xml'
         fsgm_image_path = os.path.join(image_dir, image_name)    
         fsgm_label_path = os.path.join(image_dir, label_name)    
 
@@ -176,7 +181,7 @@ def main (args):
 
         etree.ElementTree(anno_tree).write(fsgm_label_path, pretty_print=True)        
     
-    def create_adversarial_attack(epsilon, base_dir, output_dir, width, height, classes, class_mapping, device, number_max_fgsm=500):
+    def create_adversarial_attack(epsilon, base_dir, output_dir, width, height, classes, class_mapping, device, number_max_fgsm=5000):
         """
         Generates a fixed number of adversarial attacks from random images in the dataset.
 

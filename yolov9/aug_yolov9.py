@@ -59,7 +59,6 @@ def main (args):
     A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=30, p=0.6),
     A.RandomCrop(width=min(WIDTH, 640), height=min(HEIGHT, 640), p=0.6),
     A.CoarseDropout(max_holes=8, max_height=8, max_width=8, p=0.5),
-    #A.Normalize(mean=(0, 0, 0), std=(1, 1, 1), max_pixel_value=255),  # This standardizes the color scale
     ToTensorV2(p=1.0)
     ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels'], min_visibility=0.3))
 
@@ -124,6 +123,7 @@ def main (args):
             cv2.imwrite(os.path.join(SAVE_DIR_EXAMPLES_PATH, f'random_example_{i}.jpg'), image)
 
     def process_augmentation(base_dir, output_dir, augmentation_pipeline, classes_to_augment, NUMBER_OF_AUGMETATION_PER_IMAGE, class_names):
+        aug_examples = []
         # Process each directory
         for folder in ['train', 'valid', 'test']:
             image_dir = os.path.join(base_dir, folder, 'images')
@@ -151,6 +151,8 @@ def main (args):
                         if augmented_bboxes and augmented_class_labels:
                             #aug_examples.append(augmented_image)
                             save_augmented_image_and_labels(augmented_image, augmented_bboxes, augmented_class_labels, image_path, label_path, output_image_dir, output_label_dir, i, class_names)
+
+        return aug_examples
     
     def generate_haze (base_dir, num_images=800) :
         # Link to download the model checkpoint : https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true 
@@ -218,12 +220,21 @@ def main (args):
                     # Save the .txt file with '_hazed' appended
                     with open(hazed_txt_path, 'w') as hazed_txt_file:
                         hazed_txt_file.write(txt_content)
- 
+    
+    aug_examples = []
+
     generate_haze(BASE_DIR)
 
-    process_augmentation(BASE_DIR, OUTPUT_DIR, augmentation_pipeline, CLASSES_TO_AUGMENT, NUMBER_OF_AUGMETATION_PER_IMAGE, CLASS_NAMES)
+    aug_array = process_augmentation(BASE_DIR, OUTPUT_DIR, augmentation_pipeline, CLASSES_TO_AUGMENT, NUMBER_OF_AUGMETATION_PER_IMAGE, CLASS_NAMES)
 
-    print('Generation augmetation has completed successfully')
+    #aug_examples.extend(aug_array)
+
+    # Select 10 random examples
+    #random_examples = random.sample(aug_examples, 10 if len(aug_examples) > 10 else len(aug_examples))
+
+    #save_some_examples(random_examples, SAVE_DIR_EXAMPLES_PATH)
+
+    #print('Generation augmetation has completed successfully')
 
 
 if __name__ == '__main__':
